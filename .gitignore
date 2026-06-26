@@ -1,0 +1,22 @@
+# Base de datos local y fotos de prueba
+base_datos.sqlite
+media/
+
+# Datos personales reales de pruebas (NO subir: privacidad)
+fotos/
+lista_hospital_perez_carreno.csv
+reporte.md
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# Entorno / secretos
+.env
+
+# Sistema
+.DS_Store
+Thumbs.db

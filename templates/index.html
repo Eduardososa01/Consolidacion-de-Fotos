@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="text-center py-6">
+  <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
+    ¿Buscas a un familiar?
+  </h1>
+  <p class="mt-2 text-slate-600 max-w-2xl mx-auto">
+    Hospitales y voluntarios suben aquí las listas de personas ingresadas.
+    Escribe el nombre o la cédula de tu familiar para ver si está registrado.
+  </p>
+
+  <form action="/" method="get" class="mt-5 max-w-2xl mx-auto">
+    <div class="flex gap-2">
+      <input type="text" name="q" value="{{ q }}" autofocus
+             placeholder="Buscar por nombre o cédula…"
+             class="flex-1 rounded-lg border border-slate-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-red-400">
+      <button class="bg-slate-900 hover:bg-slate-800 text-white font-semibold px-6 rounded-lg">
+        Buscar
+      </button>
+    </div>
+    <div class="flex flex-wrap gap-2 mt-2 justify-center text-sm">
+      <input type="text" name="hospital" value="{{ hospital }}" placeholder="Hospital"
+             class="rounded-lg border border-slate-300 px-3 py-2">
+      <input type="text" name="ciudad" value="{{ ciudad }}" placeholder="Ciudad"
+             class="rounded-lg border border-slate-300 px-3 py-2">
+    </div>
+  </form>
+
+  <p class="mt-3 text-xs text-slate-500">
+    {{ stats.personas }} persona(s) registradas · {{ stats.listas }} lista(s) subidas
+  </p>
+</section>
+
+<section class="mt-2">
+  {% if busco %}
+    <h2 class="text-sm font-semibold text-slate-500 mb-3">
+      {{ resultados|length }} resultado(s)
+    </h2>
+  {% else %}
+    <h2 class="text-sm font-semibold text-slate-500 mb-3">Últimos registros</h2>
+  {% endif %}
+
+  {% if resultados %}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {% for p in resultados %}
+        <a href="/persona/{{ p.id }}"
+           class="bg-white rounded-xl shadow-sm hover:shadow-md transition overflow-hidden border border-slate-200">
+          <img src="/foto/{{ p.registro_id }}" alt="foto" loading="lazy"
+               class="w-full h-44 object-cover bg-slate-200">
+          <div class="p-3">
+            <p class="font-semibold text-slate-900">
+              {{ p.nombre if p.nombre else "(sin nombre)" }}
+            </p>
+            {% if p.cedula %}<p class="text-xs text-slate-500">C.I. {{ p.cedula }}</p>{% endif %}
+            {% if p.hospital %}<p class="text-sm text-slate-600 mt-1">{{ p.hospital }}</p>{% endif %}
+            <p class="text-xs text-slate-400 mt-1">
+              {% if p.ciudad %}{{ p.ciudad }} · {% endif %}
+              {% if p.tipo == 'lista' %}de una lista{% else %}persona encontrada{% endif %}
+            </p>
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="text-center text-slate-500 py-10">
+      {% if busco %}
+        No se encontró a nadie con esos datos.
+        <p class="text-sm mt-1">Prueba con menos letras del nombre o revisa la ortografía.</p>
+      {% else %}
+        Aún no hay registros. Sé el primero en
+        <a href="/subir" class="text-red-600 underline">subir una lista</a>.
+      {% endif %}
+    </div>
+  {% endif %}
+</section>
+
+{% endblock %}

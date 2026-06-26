@@ -1,0 +1,16 @@
+# Configuracion de despliegue para Render (https://render.com).
+# Conecta tu repo de GitHub y Render lee este archivo automaticamente.
+services:
+  - type: web
+    name: reconexion
+    runtime: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn app:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false          # la pones tu en el panel de Render (secreta)
+      - key: DATABASE_URL
+        sync: false          # la cadena de conexion de Supabase (Postgres)
+      - key: PYTHON_VERSION
+        value: "3.12.6"
