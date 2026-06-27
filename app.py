@@ -28,7 +28,7 @@ import extraccion
 
 BASE = Path(__file__).parent
 
-app = FastAPI(title="Coordinacion de ayuda")
+app = FastAPI(title="Distribucion de Insumos")
 app.add_middleware(SessionMiddleware, secret_key=config.SECRET_KEY)
 
 # cache_size=0 evita un bug del cache de plantillas de Jinja2 en Python 3.14.
@@ -46,6 +46,15 @@ _jinja_env.globals.update(
 templates = Jinja2Templates(env=_jinja_env)
 
 db.crear_tablas()
+
+# Auto-carga: si la base esta vacia (primer arranque), crea los 10 hospitales y
+# sus capitanes. Las credenciales se imprimen en los logs del servidor.
+try:
+    if db.resumen()["hospitales"] == 0:
+        import seed
+        seed.main()
+except Exception as _e:  # noqa: BLE001
+    print("Aviso: no se pudo auto-cargar hospitales:", _e)
 
 
 def _ctx(request: Request, **extra) -> dict:

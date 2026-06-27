@@ -1,5 +1,5 @@
 ---
-title: Coordinación de Ayuda
+title: Distribución de Insumos
 emoji: 🏥
 colorFrom: red
 colorTo: blue
@@ -8,9 +8,9 @@ app_port: 7860
 pinned: false
 ---
 
-# Coordinación de Ayuda Humanitaria
+# Distribución de Insumos
 
-Plataforma para coordinar ayuda en hospitales durante una emergencia.
+Plataforma para coordinar la distribución de insumos en hospitales durante una emergencia.
 
 - **Capitanes** (1 por hospital): actualizan el estado del hospital, publican
   necesidades (insumos) y registran personas que ingresan (a mano o subiendo la
