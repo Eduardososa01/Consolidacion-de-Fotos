@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Personas — Coordinación de Ayuda{% endblock %}
+{% block content %}
+
+<section class="text-center py-4">
+  <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">¿Buscas a un familiar?</h1>
+  <p class="mt-2 text-slate-600 max-w-2xl mx-auto">
+    Personas que los hospitales han registrado al ingresar. Busca por nombre o
+    cédula para ver si tu familiar está en algún hospital.
+  </p>
+</section>
+
+<form method="get" class="max-w-2xl mx-auto">
+  <div class="flex gap-2">
+    <input type="text" name="q" value="{{ f_q }}" autofocus
+           placeholder="Buscar por nombre o cédula…"
+           class="flex-1 rounded-lg border border-slate-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-red-400">
+    <button class="bg-slate-900 hover:bg-slate-800 text-white font-semibold px-6 rounded-lg">Buscar</button>
+  </div>
+  <div class="flex flex-wrap gap-2 mt-2 justify-center text-sm">
+    <select name="municipio" class="rounded-lg border border-slate-300 px-3 py-2">
+      <option value="">Todos los municipios</option>
+      {% for m in municipios %}
+        <option value="{{ m }}" {% if m == f_municipio %}selected{% endif %}>{{ m }}</option>
+      {% endfor %}
+    </select>
+    {% if f_q or f_municipio %}
+      <a href="/personas" class="px-3 py-2 rounded-lg border border-slate-300">Limpiar</a>
+    {% endif %}
+  </div>
+</form>
+
+<p class="text-sm text-slate-500 my-4 text-center">{{ personas|length }} persona(s)</p>
+
+{% if personas %}
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for p in personas %}
+      <a href="/persona/{{ p.id }}"
+         class="bg-white rounded-xl border border-slate-200 hover:shadow-md transition p-4 block">
+        <div class="flex items-start justify-between gap-2">
+          <h2 class="font-semibold text-slate-900">
+            {{ p.nombre }} {{ p.apellido }}{% if not p.nombre and not p.apellido %}(Sin nombre){% endif %}
+          </h2>
+          {% if p.tipo_sangre %}<span class="text-xs font-bold text-red-600 border border-red-200 bg-red-50 rounded px-1.5 py-0.5">{{ p.tipo_sangre }}</span>{% endif %}
+        </div>
+        {% if p.cedula %}<p class="text-xs text-slate-500 mt-0.5">C.I. {{ p.cedula }}</p>{% endif %}
+        <p class="text-sm text-slate-600 mt-2">{{ p.hospital_nombre }}</p>
+        <p class="text-xs text-slate-400 mt-1">
+          {% if p.municipio %}{{ p.municipio }}{% endif %}
+          {% if p.edad %} · {{ p.edad }}{% endif %}
+          {% if p.estado %} · {{ p.estado }}{% endif %}
+        </p>
+      </a>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="text-center text-slate-500 py-10">
+    {% if f_q or f_municipio %}
+      No se encontró a nadie con esos datos.
+      <p class="text-sm mt-1">Prueba con menos letras del nombre o revisa la ortografía.</p>
+    {% else %}
+      Todavía no hay personas registradas.
+    {% endif %}
+  </div>
+{% endif %}
+
+{% endblock %}

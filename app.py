@@ -16,7 +16,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import jinja2
-from fastapi import FastAPI, Form, Request
+from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -24,6 +24,7 @@ from starlette.middleware.sessions import SessionMiddleware
 import auth
 import config
 import db
+import extraccion
 
 BASE = Path(__file__).parent
 
@@ -40,7 +41,7 @@ _jinja_env = jinja2.Environment(
 _jinja_env.globals.update(
     ETIQUETAS=db.ETIQUETAS, INSUMOS=db.INSUMOS, PRIORIDADES=db.PRIORIDADES,
     ESTADOS=db.ESTADOS, SEMAFOROS=db.SEMAFOROS, RECIBIENDO=db.RECIBIENDO,
-    CAPACIDADES=db.CAPACIDADES,
+    CAPACIDADES=db.CAPACIDADES, TIPOS_SANGRE=db.TIPOS_SANGRE,
 )
 templates = Jinja2Templates(env=_jinja_env)
 
@@ -106,6 +107,23 @@ def ayudar(request: Request, request_id: int,
     return RedirectResponse(f"/necesidad/{request_id}?ok=1", status_code=303)
 
 
+@app.get("/personas", response_class=HTMLResponse)
+def personas(request: Request, q: str = "", municipio: str = ""):
+    pac = db.listar_patients(q=q, municipio=municipio)
+    return templates.TemplateResponse(request, "personas.html", _ctx(
+        request, personas=pac, municipios=db.municipios(),
+        f_q=q, f_municipio=municipio,
+    ))
+
+
+@app.get("/persona/{patient_id}", response_class=HTMLResponse)
+def persona(request: Request, patient_id: int):
+    p = db.obtener_patient(patient_id)
+    if not p:
+        return RedirectResponse("/personas", status_code=303)
+    return templates.TemplateResponse(request, "persona.html", _ctx(request, p=p))
+
+
 # ===================== CAPITAN: login =====================
 
 @app.get("/entrar", response_class=HTMLResponse)
@@ -135,7 +153,7 @@ def salir(request: Request):
 # ===================== CAPITAN: panel =====================
 
 @app.get("/panel", response_class=HTMLResponse)
-def panel(request: Request, ok: str = ""):
+def panel(request: Request, ok: str = "", n: int = 0):
     cap = auth.capitan_actual(request)
     if not cap:
         return RedirectResponse("/entrar", status_code=303)
@@ -143,9 +161,10 @@ def panel(request: Request, ok: str = ""):
     reqs = db.listar_requests(hospital_id=cap["hospital_id"])
     # compromisos por cada request (para que el capitan los vea)
     comp = {r["id"]: db.listar_commitments(r["id"]) for r in reqs}
+    pac = db.listar_patients(hospital_id=cap["hospital_id"])
     return templates.TemplateResponse(request, "panel.html",
                                       _ctx(request, h=h, requests=reqs,
-                                           compromisos=comp, ok=ok))
+                                           compromisos=comp, personas=pac, ok=ok, n=n))
 
 
 @app.post("/panel/estado")
@@ -181,6 +200,46 @@ def panel_request_nuevo(request: Request, tipo_insumo: str = Form(...),
     return RedirectResponse("/panel?ok=request", status_code=303)
 
 
+@app.post("/panel/persona/nuevo")
+def panel_persona_nuevo(request: Request, nombre: str = Form(""),
+                        apellido: str = Form(""), cedula: str = Form(""),
+                        tipo_sangre: str = Form(""), edad: str = Form(""),
+                        sexo: str = Form(""), estado: str = Form(""),
+                        observaciones: str = Form("")):
+    cap = auth.capitan_actual(request)
+    if not cap:
+        return RedirectResponse("/entrar", status_code=303)
+    db.crear_patient(cap["hospital_id"], nombre.strip(), apellido.strip(),
+                     cedula.strip(), tipo_sangre.strip(), edad.strip(),
+                     sexo.strip(), estado.strip(), observaciones.strip())
+    return RedirectResponse("/panel?ok=persona", status_code=303)
+
+
+@app.post("/panel/persona/lista")
+async def panel_persona_lista(request: Request, foto: UploadFile = File(...)):
+    cap = auth.capitan_actual(request)
+    if not cap:
+        return RedirectResponse("/entrar", status_code=303)
+    if not extraccion.hay_api():
+        return RedirectResponse("/panel?ok=sinapi", status_code=303)
+    ext = Path(foto.filename or "").suffix.lower()
+    if ext not in extraccion.EXTENSIONES_IMAGEN:
+        return RedirectResponse("/panel?ok=noimg", status_code=303)
+    datos = await foto.read()
+    try:
+        lista = extraccion.extraer_personas(datos, extraccion.MEDIA_TYPES[ext])
+    except Exception:  # noqa: BLE001
+        return RedirectResponse("/panel?ok=errlista", status_code=303)
+    n = 0
+    for p in lista.personas:
+        if p.nombre.strip():
+            db.crear_patient(cap["hospital_id"], p.nombre.strip(), "",
+                             p.cedula.strip(), "", "", "", "",
+                             "Importado de una lista")
+            n += 1
+    return RedirectResponse(f"/panel?ok=lista&n={n}", status_code=303)
+
+
 @app.post("/panel/request/{request_id}/estado")
 def panel_request_estado(request: Request, request_id: int, estado: str = Form(...)):
     cap = auth.capitan_actual(request)
@@ -191,3 +250,25 @@ def panel_request_estado(request: Request, request_id: int, estado: str = Form(.
     if r and r["hospital_id"] == cap["hospital_id"] and estado in db.ESTADOS:
         db.cambiar_estado_request(request_id, estado)
     return RedirectResponse("/panel?ok=estado_req", status_code=303)
+
+
+@app.post("/panel/request/{request_id}/borrar")
+def panel_request_borrar(request: Request, request_id: int):
+    cap = auth.capitan_actual(request)
+    if not cap:
+        return RedirectResponse("/entrar", status_code=303)
+    r = db.obtener_request(request_id)
+    if r and r["hospital_id"] == cap["hospital_id"]:
+        db.borrar_request(request_id)
+    return RedirectResponse("/panel?ok=del_req", status_code=303)
+
+
+@app.post("/panel/persona/{patient_id}/borrar")
+def panel_persona_borrar(request: Request, patient_id: int):
+    cap = auth.capitan_actual(request)
+    if not cap:
+        return RedirectResponse("/entrar", status_code=303)
+    p = db.obtener_patient(patient_id)
+    if p and p["hospital_id"] == cap["hospital_id"]:
+        db.borrar_patient(patient_id)
+    return RedirectResponse("/panel?ok=del_persona", status_code=303)

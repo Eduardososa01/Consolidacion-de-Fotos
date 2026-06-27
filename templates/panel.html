@@ -14,6 +14,13 @@
 {% if ok == 'estado' %}<div class="bg-green-100 border border-green-300 text-green-800 rounded-lg px-4 py-2 mt-3 text-sm">Estado actualizado.</div>{% endif %}
 {% if ok == 'request' %}<div class="bg-green-100 border border-green-300 text-green-800 rounded-lg px-4 py-2 mt-3 text-sm">Necesidad publicada.</div>{% endif %}
 {% if ok == 'estado_req' %}<div class="bg-green-100 border border-green-300 text-green-800 rounded-lg px-4 py-2 mt-3 text-sm">Estado de la necesidad actualizado.</div>{% endif %}
+{% if ok == 'persona' %}<div class="bg-green-100 border border-green-300 text-green-800 rounded-lg px-4 py-2 mt-3 text-sm">Persona publicada.</div>{% endif %}
+{% if ok == 'lista' %}<div class="bg-green-100 border border-green-300 text-green-800 rounded-lg px-4 py-2 mt-3 text-sm">Lista leída: se agregaron {{ n }} persona(s).</div>{% endif %}
+{% if ok == 'sinapi' %}<div class="bg-amber-100 border border-amber-300 text-amber-800 rounded-lg px-4 py-2 mt-3 text-sm">No se pudo leer la lista: falta configurar la clave de visión (ANTHROPIC_API_KEY) en el servidor.</div>{% endif %}
+{% if ok == 'noimg' %}<div class="bg-red-100 border border-red-300 text-red-800 rounded-lg px-4 py-2 mt-3 text-sm">El archivo no es una imagen válida.</div>{% endif %}
+{% if ok == 'errlista' %}<div class="bg-red-100 border border-red-300 text-red-800 rounded-lg px-4 py-2 mt-3 text-sm">Hubo un error al leer la lista. Intenta con otra foto.</div>{% endif %}
+{% if ok == 'del_persona' %}<div class="bg-slate-200 border border-slate-300 text-slate-700 rounded-lg px-4 py-2 mt-3 text-sm">Persona eliminada.</div>{% endif %}
+{% if ok == 'del_req' %}<div class="bg-slate-200 border border-slate-300 text-slate-700 rounded-lg px-4 py-2 mt-3 text-sm">Necesidad eliminada.</div>{% endif %}
 
 <div class="grid lg:grid-cols-2 gap-5 mt-5">
 
@@ -84,10 +91,100 @@
       </div>
       <textarea name="descripcion" rows="2" placeholder="Detalle (opcional)"
                 class="w-full rounded-lg border border-slate-300 px-3 py-2"></textarea>
-      <button class="bg-red-500 hover:bg-red-600 text-white font-semibold px-4 py-2 rounded-lg">Publicar</button>
+      <button class="bg-red-500 hover:bg-red-600 text-white font-semibold px-4 py-2 rounded-lg">Publicar necesidad</button>
     </form>
   </section>
 </div>
+
+<!-- Ticket 2: Publicar una persona -->
+<section class="bg-white rounded-xl border border-slate-200 p-5 mt-5">
+  <h2 class="font-bold text-slate-900 mb-1">Publicar una persona</h2>
+  <p class="text-sm text-slate-500 mb-3">
+    Registra a alguien que ingresó al hospital. Aparecerá en la sección pública
+    <strong>Personas</strong> para que las familias puedan encontrarlo.
+  </p>
+  <form method="post" action="/panel/persona/nuevo" class="space-y-3 text-sm">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <label class="block">Nombre
+        <input type="text" name="nombre" placeholder="Nombre (o 'No identificado')"
+               class="w-full rounded-lg border border-slate-300 px-3 py-2 mt-1">
+      </label>
+      <label class="block">Apellido
+        <input type="text" name="apellido"
+               class="w-full rounded-lg border border-slate-300 px-3 py-2 mt-1">
+      </label>
+      <label class="block">Cédula de identidad
+        <input type="text" name="cedula" placeholder="Ej. 12345678 (si se conoce)"
+               class="w-full rounded-lg border border-slate-300 px-3 py-2 mt-1">
+      </label>
+      <label class="block">Tipo de sangre
+        <select name="tipo_sangre" class="w-full rounded-lg border border-slate-300 px-3 py-2 mt-1">
+          <option value="">— No indicado —</option>
+          {% for ts in TIPOS_SANGRE %}<option value="{{ ts }}">{{ ts }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="block">Edad (aprox.)
+        <input type="text" name="edad" placeholder="Ej. 35 o 'adulto'"
+               class="w-full rounded-lg border border-slate-300 px-3 py-2 mt-1">
+      </label>
+      <label class="block">Sexo
+        <select name="sexo" class="w-full rounded-lg border border-slate-300 px-3 py-2 mt-1">
+          <option value="">— No indicado —</option>
+          <option value="Femenino">Femenino</option>
+          <option value="Masculino">Masculino</option>
+          <option value="Otro">Otro</option>
+        </select>
+      </label>
+      <label class="block">Estado del paciente
+        <input type="text" name="estado" placeholder="Ej. estable, grave, en observación"
+               class="w-full rounded-lg border border-slate-300 px-3 py-2 mt-1">
+      </label>
+    </div>
+    <textarea name="observaciones" rows="2" placeholder="Observaciones (señas, ropa, dónde fue encontrado, etc.)"
+              class="w-full rounded-lg border border-slate-300 px-3 py-2"></textarea>
+    <button class="bg-slate-900 hover:bg-slate-800 text-white font-semibold px-4 py-2 rounded-lg">Publicar persona</button>
+  </form>
+
+  <div class="border-t border-slate-100 mt-4 pt-4">
+    <h3 class="font-semibold text-slate-900 text-sm mb-1">O sube la foto de una lista</h3>
+    <p class="text-xs text-slate-500 mb-3">
+      Sube la foto de una lista del hospital y se leen los nombres automáticamente
+      para agregarlos a Personas.
+    </p>
+    <form method="post" action="/panel/persona/lista" enctype="multipart/form-data"
+          class="flex flex-wrap items-center gap-2 text-sm">
+      <input type="file" name="foto" accept="image/*" required
+             class="text-sm border border-slate-300 rounded-lg px-3 py-2">
+      <button class="bg-slate-700 hover:bg-slate-600 text-white font-semibold px-4 py-2 rounded-lg">
+        Leer lista
+      </button>
+    </form>
+    <p class="text-xs text-slate-400 mt-2">Leer una lista puede tardar unos segundos.</p>
+  </div>
+</section>
+
+<!-- Personas publicadas -->
+{% if personas %}
+  <h2 class="text-lg font-bold text-slate-900 mt-6 mb-3">Personas que publiqué ({{ personas|length }})</h2>
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    {% for p in personas %}
+      <div class="bg-white rounded-xl border border-slate-200 p-4 flex items-start justify-between gap-2">
+        <a href="/persona/{{ p.id }}" class="block flex-1 hover:opacity-80">
+          <div class="font-semibold text-slate-900">{{ p.nombre }} {{ p.apellido }}{% if not p.nombre and not p.apellido %}(Sin nombre){% endif %}</div>
+          <div class="text-xs text-slate-500">
+            {% if p.cedula %}C.I. {{ p.cedula }} · {% endif %}
+            {% if p.tipo_sangre %}<span class="text-red-600 font-semibold">{{ p.tipo_sangre }}</span> · {% endif %}
+            {% if p.edad %}{{ p.edad }} · {% endif %}{{ p.estado }}
+          </div>
+        </a>
+        <form method="post" action="/panel/persona/{{ p.id }}/borrar"
+              onsubmit="return confirm('¿Eliminar a esta persona?');">
+          <button class="text-xs text-red-600 hover:bg-red-50 border border-red-200 rounded-lg px-2 py-1">Eliminar</button>
+        </form>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
 
 <!-- Necesidades del hospital -->
 <h2 class="text-lg font-bold text-slate-900 mt-6 mb-3">Mis necesidades</h2>
@@ -101,12 +198,18 @@
             {% if r.cantidad %}<span class="text-slate-500">· {{ r.cantidad }}</span>{% endif %}
             {{ prioridad_badge(r.prioridad) }} {{ estado_badge(r.estado) }}
           </div>
-          <form method="post" action="/panel/request/{{ r.id }}/estado" class="flex gap-2 items-center text-sm">
-            <select name="estado" class="rounded-lg border border-slate-300 px-2 py-1.5">
-              {% for e in ESTADOS %}<option value="{{ e }}" {% if e==r.estado %}selected{% endif %}>{{ ETIQUETAS.get(e) }}</option>{% endfor %}
-            </select>
-            <button class="bg-slate-700 text-white px-3 py-1.5 rounded-lg">Actualizar</button>
-          </form>
+          <div class="flex gap-2 items-center text-sm">
+            <form method="post" action="/panel/request/{{ r.id }}/estado" class="flex gap-2 items-center">
+              <select name="estado" class="rounded-lg border border-slate-300 px-2 py-1.5">
+                {% for e in ESTADOS %}<option value="{{ e }}" {% if e==r.estado %}selected{% endif %}>{{ ETIQUETAS.get(e) }}</option>{% endfor %}
+              </select>
+              <button class="bg-slate-700 text-white px-3 py-1.5 rounded-lg">Actualizar</button>
+            </form>
+            <form method="post" action="/panel/request/{{ r.id }}/borrar"
+                  onsubmit="return confirm('¿Eliminar esta necesidad?');">
+              <button class="text-red-600 hover:bg-red-50 border border-red-200 rounded-lg px-3 py-1.5">Eliminar</button>
+            </form>
+          </div>
         </div>
         {% set comps = compromisos.get(r.id, []) %}
         {% if comps %}

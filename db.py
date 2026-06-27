@@ -11,14 +11,22 @@ Tablas:
 
 from __future__ import annotations
 
+import unicodedata
 from datetime import datetime, timezone
 
 from sqlalchemy import (
     Boolean, Integer, MetaData, String, Table, Column, ForeignKey,
-    create_engine, func, select,
+    create_engine, func, inspect, select, text,
 )
 
 import config
+
+
+def normalizar(texto: str) -> str:
+    """Quita acentos, mayusculas y espacios extra para comparar nombres."""
+    sin = "".join(c for c in unicodedata.normalize("NFD", texto or "")
+                  if unicodedata.category(c) != "Mn")
+    return " ".join(sin.lower().split())
 
 engine = create_engine(config.DATABASE_URL, pool_pre_ping=True)
 metadata = MetaData()
@@ -30,6 +38,7 @@ RECIBIENDO = ["si", "no", "con_restricciones"]
 CAPACIDADES = ["desbordado", "al_limite", "con_capacidad"]
 PRIORIDADES = ["alta", "media", "baja"]
 ESTADOS = ["pendiente", "en_camino", "recibido", "completado"]
+TIPOS_SANGRE = ["O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-"]
 
 # Insumos sugeridos (el capitan puede escribir otro).
 INSUMOS = [
@@ -90,6 +99,11 @@ requests = Table(
     Column("cantidad", String(120), default=""),
     Column("prioridad", String(20), default="media"),
     Column("estado", String(20), default="pendiente"),
+    # Datos del paciente (opcionales; utiles para pedidos de sangre)
+    Column("paciente_nombre", String(200), default=""),
+    Column("paciente_apellido", String(200), default=""),
+    Column("paciente_cedula", String(60), default=""),
+    Column("paciente_tipo_sangre", String(10), default=""),
     Column("creado_en", String(40), nullable=False),
     Column("actualizado_en", String(40), nullable=False),
 )
@@ -106,9 +120,45 @@ commitments = Table(
     Column("creado_en", String(40), nullable=False),
 )
 
+# Personas que el capitan registra al ver entrar a alguien al hospital.
+patients = Table(
+    "patients", metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("hospital_id", Integer, ForeignKey("hospitals.id", ondelete="CASCADE"), nullable=False),
+    Column("nombre", String(200), default=""),
+    Column("apellido", String(200), default=""),
+    Column("nombre_normalizado", String(400), default=""),
+    Column("cedula", String(60), default=""),
+    Column("tipo_sangre", String(10), default=""),
+    Column("edad", String(40), default=""),
+    Column("sexo", String(20), default=""),
+    Column("estado", String(120), default=""),
+    Column("observaciones", String(1000), default=""),
+    Column("creado_en", String(40), nullable=False),
+)
+
 
 def crear_tablas() -> None:
     metadata.create_all(engine)
+    _migrar_columnas_paciente()
+
+
+def _migrar_columnas_paciente() -> None:
+    """Anade las columnas de paciente a 'requests' si una base vieja no las tiene."""
+    insp = inspect(engine)
+    if "requests" not in insp.get_table_names():
+        return
+    existentes = {c["name"] for c in insp.get_columns("requests")}
+    nuevas = {
+        "paciente_nombre": "VARCHAR(200)",
+        "paciente_apellido": "VARCHAR(200)",
+        "paciente_cedula": "VARCHAR(60)",
+        "paciente_tipo_sangre": "VARCHAR(10)",
+    }
+    with engine.begin() as con:
+        for nombre, tipo in nuevas.items():
+            if nombre not in existentes:
+                con.execute(text(f"ALTER TABLE requests ADD COLUMN {nombre} {tipo} DEFAULT ''"))
 
 
 def ahora() -> str:
@@ -171,12 +221,16 @@ def municipios() -> list[str]:
 # --- Requests (necesidades) ------------------------------------------------
 
 def crear_request(hospital_id: int, tipo_insumo: str, descripcion: str,
-                  cantidad: str, prioridad: str) -> int:
+                  cantidad: str, prioridad: str, paciente_nombre: str = "",
+                  paciente_apellido: str = "", paciente_cedula: str = "",
+                  paciente_tipo_sangre: str = "") -> int:
     t = ahora()
     with engine.begin() as con:
         return con.execute(requests.insert().values(
             hospital_id=hospital_id, tipo_insumo=tipo_insumo, descripcion=descripcion,
             cantidad=cantidad, prioridad=prioridad, estado="pendiente",
+            paciente_nombre=paciente_nombre, paciente_apellido=paciente_apellido,
+            paciente_cedula=paciente_cedula, paciente_tipo_sangre=paciente_tipo_sangre,
             creado_en=t, actualizado_en=t,
         )).inserted_primary_key[0]
 
@@ -184,6 +238,8 @@ def crear_request(hospital_id: int, tipo_insumo: str, descripcion: str,
 _REQ_COLS = [
     requests.c.id, requests.c.tipo_insumo, requests.c.descripcion,
     requests.c.cantidad, requests.c.prioridad, requests.c.estado,
+    requests.c.paciente_nombre, requests.c.paciente_apellido,
+    requests.c.paciente_cedula, requests.c.paciente_tipo_sangre,
     requests.c.creado_en, requests.c.actualizado_en,
     requests.c.hospital_id, hospitals.c.nombre.label("hospital_nombre"),
     hospitals.c.municipio, hospitals.c.ciudad,
@@ -235,6 +291,12 @@ def cambiar_estado_request(request_id: int, estado: str) -> None:
                     .values(estado=estado, actualizado_en=ahora()))
 
 
+def borrar_request(request_id: int) -> None:
+    with engine.begin() as con:
+        con.execute(commitments.delete().where(commitments.c.request_id == request_id))
+        con.execute(requests.delete().where(requests.c.id == request_id))
+
+
 # --- Commitments (compromisos de donantes) ---------------------------------
 
 def crear_commitment(request_id: int, nombre_donante: str, que_envia: str,
@@ -270,6 +332,65 @@ def _commitments_por_request(ids: list[int]) -> dict[int, int]:
         return {row[0]: row[1] for row in con.execute(stmt)}
 
 
+# --- Personas (pacientes que el capitan registra) --------------------------
+
+def crear_patient(hospital_id: int, nombre: str, apellido: str, cedula: str,
+                  tipo_sangre: str, edad: str, sexo: str, estado: str,
+                  observaciones: str) -> int:
+    norm = normalizar(f"{nombre} {apellido}")
+    with engine.begin() as con:
+        return con.execute(patients.insert().values(
+            hospital_id=hospital_id, nombre=nombre, apellido=apellido,
+            nombre_normalizado=norm, cedula=cedula, tipo_sangre=tipo_sangre,
+            edad=edad, sexo=sexo, estado=estado, observaciones=observaciones,
+            creado_en=ahora(),
+        )).inserted_primary_key[0]
+
+
+_PAC_COLS = [
+    patients.c.id, patients.c.nombre, patients.c.apellido, patients.c.cedula,
+    patients.c.tipo_sangre, patients.c.edad, patients.c.sexo, patients.c.estado,
+    patients.c.observaciones, patients.c.creado_en, patients.c.hospital_id,
+    hospitals.c.nombre.label("hospital_nombre"), hospitals.c.municipio,
+    hospitals.c.ciudad,
+]
+
+
+def listar_patients(q: str = "", hospital_id: int | None = None,
+                    municipio: str = "", limite: int = 300) -> list[dict]:
+    j = patients.join(hospitals, hospitals.c.id == patients.c.hospital_id)
+    stmt = select(*_PAC_COLS).select_from(j)
+    q = q.strip()
+    if q:
+        solo = q.replace(".", "").replace("-", "").replace(" ", "")
+        if solo.isdigit():   # parece cedula
+            limpia = func.replace(func.replace(patients.c.cedula, ".", ""), "-", "")
+            stmt = stmt.where(limpia.like(f"%{solo}%"))
+        else:
+            stmt = stmt.where(patients.c.nombre_normalizado.like(f"%{normalizar(q)}%"))
+    if hospital_id is not None:
+        stmt = stmt.where(patients.c.hospital_id == hospital_id)
+    if municipio.strip():
+        stmt = stmt.where(hospitals.c.municipio.ilike(f"%{municipio.strip()}%"))
+    stmt = stmt.order_by(patients.c.creado_en.desc()).limit(limite)
+    with engine.connect() as con:
+        return [dict(r._mapping) for r in con.execute(stmt)]
+
+
+def obtener_patient(patient_id: int) -> dict | None:
+    j = patients.join(hospitals, hospitals.c.id == patients.c.hospital_id)
+    stmt = select(*_PAC_COLS, hospitals.c.telefono.label("hospital_telefono")) \
+        .select_from(j).where(patients.c.id == patient_id)
+    with engine.connect() as con:
+        r = con.execute(stmt).first()
+        return dict(r._mapping) if r else None
+
+
+def borrar_patient(patient_id: int) -> None:
+    with engine.begin() as con:
+        con.execute(patients.delete().where(patients.c.id == patient_id))
+
+
 # --- Resumen para la home --------------------------------------------------
 
 def resumen() -> dict:
@@ -282,4 +403,6 @@ def resumen() -> dict:
             select(func.count()).select_from(hospitals)
             .where(hospitals.c.semaforo_insumos == "critico")
         ).scalar() or 0
-    return {"hospitales": n_hosp, "necesidades_activas": n_act, "hospitales_criticos": n_crit}
+        n_pac = con.execute(select(func.count()).select_from(patients)).scalar() or 0
+    return {"hospitales": n_hosp, "necesidades_activas": n_act,
+            "hospitales_criticos": n_crit, "personas": n_pac}

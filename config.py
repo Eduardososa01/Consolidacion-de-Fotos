@@ -30,3 +30,7 @@ ES_SQLITE = DATABASE_URL.startswith("sqlite")
 # Clave para firmar las cookies de sesion. En produccion se define SECRET_KEY;
 # en local hay un valor por defecto (no usar el default en produccion).
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-cambia-esto-en-produccion")
+
+# --- API de vision (leer fotos de listas) ----------------------------------
+# Necesaria para el feature de "subir foto de lista" en el panel del capitan.
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")

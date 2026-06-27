@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ p.nombre }} {{ p.apellido }} — Persona{% endblock %}
+{% block content %}
+
+<a href="/personas" class="text-sm text-slate-500 hover:underline">← Volver a buscar</a>
+
+<div class="mt-3 bg-white rounded-xl border border-slate-200 p-5">
+  <div class="flex flex-wrap items-start justify-between gap-2">
+    <h1 class="text-2xl font-bold text-slate-900">
+      {{ p.nombre }} {{ p.apellido }}{% if not p.nombre and not p.apellido %}(Sin nombre confirmado){% endif %}
+    </h1>
+    {% if p.tipo_sangre %}
+      <span class="text-sm font-bold text-red-600 border border-red-200 bg-red-50 rounded-full px-3 py-1">
+        Sangre {{ p.tipo_sangre }}
+      </span>
+    {% endif %}
+  </div>
+
+  <dl class="mt-4 space-y-1.5 text-sm">
+    {% if p.cedula %}<div><dt class="font-semibold inline">Cédula:</dt> {{ p.cedula }}</div>{% endif %}
+    <div><dt class="font-semibold inline">Hospital:</dt>
+      <a href="/hospital/{{ p.hospital_id }}" class="text-slate-700 hover:underline">{{ p.hospital_nombre }}</a>
+      {% if p.municipio %}<span class="text-slate-400">· {{ p.municipio }}</span>{% endif %}
+    </div>
+    {% if p.edad %}<div><dt class="font-semibold inline">Edad:</dt> {{ p.edad }}</div>{% endif %}
+    {% if p.sexo %}<div><dt class="font-semibold inline">Sexo:</dt> {{ p.sexo }}</div>{% endif %}
+    {% if p.estado %}<div><dt class="font-semibold inline">Estado:</dt> {{ p.estado }}</div>{% endif %}
+    {% if p.observaciones %}<div><dt class="font-semibold inline">Observaciones:</dt> {{ p.observaciones }}</div>{% endif %}
+    {% if p.hospital_telefono %}<div><dt class="font-semibold inline">Tel. hospital:</dt> {{ p.hospital_telefono }}</div>{% endif %}
+    <div class="text-slate-400">Registrado: {{ p.creado_en }} (UTC)</div>
+  </dl>
+
+  <div class="mt-5 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-3 py-2">
+    ¿Crees que es tu familiar? Verifica siempre directamente con el hospital antes de actuar.
+  </div>
+</div>
+
+{% endblock %}
