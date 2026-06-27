@@ -47,6 +47,28 @@ git push -u origin main
 
 ## Paso 3 — Desplegar la app en Render
 
+## Opción B (recomendada si Render/Koyeb piden verificar identidad) — Hugging Face Spaces
+
+Gratis, 24/7, normalmente **sin verificación de identidad ni tarjeta**.
+
+1. Crea cuenta en https://huggingface.co/join (con email o GitHub).
+2. **New → Space** → nombre `coordinacion-ayuda`, **SDK: Docker**, visibilidad Public.
+3. El repo ya tiene `Dockerfile` y `README.md` listos. Sube el código al Space:
+   - En la pestaña **Files** del Space puedes arrastrar los archivos, **o**
+   - Con git: `git remote add space https://huggingface.co/spaces/TU_USUARIO/coordinacion-ayuda`
+     y `git push space main`.
+4. En **Settings → Variables and secrets** agrega:
+   - `DATABASE_URL` = cadena del Session pooler de Supabase
+   - `SECRET_KEY` = texto largo al azar
+   - `ANTHROPIC_API_KEY` = tu clave (para leer fotos de listas)
+5. El Space construye solo y te da una URL pública `https://TU_USUARIO-coordinacion-ayuda.hf.space`.
+6. Crea los hospitales/capitanes corriendo en tu PC: `py seed.py` con `DATABASE_URL`
+   apuntando a Supabase (así la base que usa el Space queda cargada).
+
+---
+
+## Opción A — Render
+
 1. Entra a https://render.com → **New → Web Service** → conecta tu GitHub y elige el
    repo `Consolidacion-de-Fotos`.
 2. Render detecta el `render.yaml`. Si te pide los datos a mano:
