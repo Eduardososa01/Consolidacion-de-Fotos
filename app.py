@@ -57,6 +57,47 @@ except Exception as _e:  # noqa: BLE001
     print("Aviso: no se pudo auto-cargar hospitales:", _e)
 
 
+def _asegurar_hospitales_extra() -> None:
+    """Agrega hospitales pedidos despues del seed inicial (idempotente).
+    Crea el hospital y su capitan solo si no existen ya (por nombre)."""
+    from sqlalchemy import select
+
+    # clave 'Insumos2026' (mismo hash/salt que el resto de capitanes)
+    CLAVE_HASH = "36361da5026c64b25825502d0b8f5ffeb8a1f90e149bbd34bee28c67b37596d2"
+    CLAVE_SALT = "b3513f2515a5749d730de68351664345"
+    extras = [
+        {"nombre": "Hospital Periférico de Catia", "tipo": "publico",
+         "sector": "Catia", "municipio": "Libertador", "ciudad": "Caracas",
+         "usuario": "capitan_11"},
+    ]
+    with db.engine.begin() as con:
+        for h in extras:
+            existe = con.execute(
+                select(db.hospitals.c.id).where(db.hospitals.c.nombre == h["nombre"])
+            ).first()
+            if existe:
+                continue
+            hid = con.execute(db.hospitals.insert().values(
+                nombre=h["nombre"], tipo=h["tipo"], sector=h["sector"],
+                municipio=h["municipio"], ciudad=h["ciudad"],
+                semaforo_insumos="estable", recibiendo_pacientes="si",
+                capacidad="con_capacidad", heridos_activos="N/D",
+                es_estimado_heridos=False, fallecidos="N/D",
+                en_terapia_intensiva="N/D", ultima_actualizacion="",
+            )).inserted_primary_key[0]
+            con.execute(db.captains.insert().values(
+                hospital_id=hid, usuario=h["usuario"],
+                clave_hash=CLAVE_HASH, clave_salt=CLAVE_SALT,
+            ))
+            print(f"Hospital agregado: {h['nombre']} (capitan {h['usuario']})")
+
+
+try:
+    _asegurar_hospitales_extra()
+except Exception as _e:  # noqa: BLE001
+    print("Aviso: no se pudo agregar hospitales extra:", _e)
+
+
 def _ctx(request: Request, **extra) -> dict:
     """Contexto base: incluye el capitan logueado (o None) para el nav."""
     extra["capitan"] = auth.capitan_actual(request)
