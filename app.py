@@ -28,7 +28,7 @@ import extraccion
 
 BASE = Path(__file__).parent
 
-app = FastAPI(title="Distribucion de Insumos")
+app = FastAPI(title="Red de Informacion Hospitales e Insumos")
 app.add_middleware(SessionMiddleware, secret_key=config.SECRET_KEY)
 
 # cache_size=0 evita un bug del cache de plantillas de Jinja2 en Python 3.14.

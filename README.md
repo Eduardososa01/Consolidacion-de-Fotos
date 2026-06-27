@@ -1,5 +1,5 @@
 ---
-title: Distribución de Insumos
+title: Red de Información Hospitales e Insumos
 emoji: 🏥
 colorFrom: red
 colorTo: blue
@@ -8,7 +8,7 @@ app_port: 7860
 pinned: false
 ---
 
-# Distribución de Insumos
+# Red de Información Hospitales e Insumos
 
 Plataforma para coordinar la distribución de insumos en hospitales durante una emergencia.
 
