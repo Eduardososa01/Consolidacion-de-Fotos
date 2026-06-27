@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "base.html" import semaforo_badge %}
+{% from "base.html" import semaforo_badge, frescura %}
 {% block content %}
 
 <section class="text-center py-4">
@@ -43,14 +43,17 @@
 {% if hospitales %}
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
     {% for h in hospitales %}
+      {% set es_critico = h.ultima_actualizacion and h.semaforo_insumos == 'critico' %}
+      {% set es_saturado = h.ultima_actualizacion and h.semaforo_insumos == 'saturado' %}
       <a href="/hospital/{{ h.id }}"
-         class="bg-white rounded-xl border border-slate-200 hover:shadow-md transition p-4 block">
+         class="bg-white rounded-xl hover:shadow-md transition p-4 block border
+                {% if es_critico %}border-red-300 ring-2 ring-red-200{% elif es_saturado %}border-amber-300{% else %}border-slate-200{% endif %}">
         <div class="flex items-start justify-between gap-2">
           <h2 class="font-semibold text-slate-900 leading-tight">{{ h.nombre }}</h2>
           {% if h.ultima_actualizacion %}
             {{ semaforo_badge(h.semaforo_insumos) }}
           {% else %}
-            <span class="text-xs font-semibold px-2 py-1 rounded-full border bg-slate-100 text-slate-500 border-slate-300">Sin información</span>
+            <span class="text-xs font-semibold px-2 py-1 rounded-full border bg-slate-100 text-slate-500 border-slate-300 whitespace-nowrap">Sin información</span>
           {% endif %}
         </div>
         <p class="text-sm text-slate-500 mt-1">
@@ -61,6 +64,7 @@
             <span>Capacidad: <strong>{{ ETIQUETAS.get(h.capacidad) }}</strong></span>
             <span>Recibe: <strong>{{ ETIQUETAS.get(h.recibiendo_pacientes) }}</strong></span>
           </div>
+          <div class="mt-2 flex flex-wrap items-center gap-2">{{ frescura(h.ultima_actualizacion) }}</div>
         {% else %}
           <div class="text-xs text-slate-400 mt-3 italic">El capitán aún no ha reportado el estado de este hospital.</div>
         {% endif %}

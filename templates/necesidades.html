@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "base.html" import estado_badge, prioridad_badge %}
+{% from "base.html" import estado_badge, prioridad_badge, frescura %}
 {% block title %}Necesidades — Red de Información Hospitales e Insumos{% endblock %}
 {% block content %}
 
@@ -45,9 +45,19 @@
             {% if r.cantidad %}<span class="text-slate-500 font-normal">· {{ r.cantidad }}</span>{% endif %}
           </div>
           <div class="text-sm text-slate-500">{{ r.hospital_nombre }}{% if r.municipio %} · {{ r.municipio }}{% endif %}</div>
-          {% if r.n_compromisos %}<div class="text-xs text-blue-600 mt-1">{{ r.n_compromisos }} persona(s) ayudando</div>{% endif %}
+          {% if r.objetivo %}
+            {% set pct = ((r.comprometido / r.objetivo) * 100) | round(0, 'floor') %}
+            {% if pct > 100 %}{% set pct = 100 %}{% endif %}
+            <div class="mt-2 max-w-xs">
+              <div class="text-xs text-slate-500 mb-0.5">{{ r.comprometido }} de {{ r.objetivo }} comprometidas</div>
+              <div class="w-full bg-slate-200 rounded-full h-1.5"><div class="bg-green-600 h-1.5 rounded-full" style="width: {{ pct }}%"></div></div>
+            </div>
+          {% elif r.n_compromisos %}
+            <div class="text-xs text-blue-600 mt-1">{{ r.n_compromisos }} persona(s) ayudando</div>
+          {% endif %}
+          <div class="mt-1">{{ frescura(r.actualizado_en, 'Actualizado') }}</div>
         </div>
-        <div class="flex gap-2 items-center">
+        <div class="flex gap-2 items-center shrink-0">
           {{ prioridad_badge(r.prioridad) }}
           {{ estado_badge(r.estado) }}
         </div>

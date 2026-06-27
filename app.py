@@ -41,6 +41,8 @@ _jinja_env.globals.update(
     ETIQUETAS=db.ETIQUETAS, INSUMOS=db.INSUMOS, PRIORIDADES=db.PRIORIDADES,
     ESTADOS=db.ESTADOS, SEMAFOROS=db.SEMAFOROS, RECIBIENDO=db.RECIBIENDO,
     CAPACIDADES=db.CAPACIDADES, TIPOS_SANGRE=db.TIPOS_SANGRE,
+    tiempo_relativo=db.tiempo_relativo, UMBRAL_VIEJO=db.UMBRAL_HORAS_VIEJO,
+    PUBLIC_BASE_URL=config.PUBLIC_BASE_URL,
 )
 templates = Jinja2Templates(env=_jinja_env)
 

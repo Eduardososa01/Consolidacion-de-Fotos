@@ -11,8 +11,12 @@ Tablas:
 
 from __future__ import annotations
 
+import re
 import unicodedata
 from datetime import datetime, timezone
+
+# Si un hospital no se actualiza en mas de estas horas, se marca como "viejo".
+UMBRAL_HORAS_VIEJO = 6
 
 from sqlalchemy import (
     Boolean, Integer, MetaData, String, Table, Column, ForeignKey,
@@ -27,6 +31,40 @@ def normalizar(texto: str) -> str:
     sin = "".join(c for c in unicodedata.normalize("NFD", texto or "")
                   if unicodedata.category(c) != "Mn")
     return " ".join(sin.lower().split())
+
+
+def parse_num(texto: str) -> int | None:
+    """Saca el primer numero entero de un texto libre ('20 unidades' -> 20)."""
+    if not texto:
+        return None
+    m = re.search(r"\d+", texto.replace(".", "").replace(",", ""))
+    return int(m.group()) if m else None
+
+
+def tiempo_relativo(iso: str | None) -> dict | None:
+    """Convierte una fecha ISO en {relativo:'hace 2 h', exacto:'27/06/2026 16:19 UTC', horas:2.1}."""
+    if not iso:
+        return None
+    try:
+        t = datetime.fromisoformat(iso)
+    except (ValueError, TypeError):
+        return None
+    if t.tzinfo is None:
+        t = t.replace(tzinfo=timezone.utc)
+    seg = (datetime.now(timezone.utc) - t).total_seconds()
+    seg = max(seg, 0)
+    horas = seg / 3600
+    if seg < 60:
+        rel = "hace un momento"
+    elif seg < 3600:
+        rel = f"hace {int(seg // 60)} min"
+    elif seg < 86400:
+        h = int(horas)
+        rel = f"hace {h} h" if h != 1 else "hace 1 h"
+    else:
+        d = int(seg // 86400)
+        rel = f"hace {d} días" if d != 1 else "hace 1 día"
+    return {"relativo": rel, "exacto": t.strftime("%d/%m/%Y %H:%M UTC"), "horas": horas}
 
 engine = create_engine(config.DATABASE_URL, pool_pre_ping=True)
 metadata = MetaData()
@@ -180,6 +218,15 @@ def listar_hospitales(municipio: str = "", semaforo: str = "") -> list[dict]:
     activos = _requests_activos_por_hospital()
     for h in filas:
         h["requests_activos"] = activos.get(h["id"], 0)
+    # ordenar para que lo CRITICO salte primero (solo cuenta si fue reportado)
+    orden = {"critico": 0, "saturado": 1}
+
+    def _clave(h: dict) -> tuple:
+        rep = bool(h["ultima_actualizacion"])
+        prio = orden.get(h["semaforo_insumos"], 2) if rep else 3
+        return (prio, h["nombre"])
+
+    filas.sort(key=_clave)
     return filas
 
 
@@ -269,10 +316,14 @@ def listar_requests(hospital_id: int | None = None, municipio: str = "",
     # ordenar por prioridad y fecha (mas reciente primero)
     filas.sort(key=lambda r: (_ORDEN_PRIORIDAD.get(r["prioridad"], 9),
                               r["creado_en"]), reverse=False)
-    # conteo de compromisos por request
-    counts = _commitments_por_request([r["id"] for r in filas])
+    # conteo y suma de compromisos por request (para la barra de progreso)
+    ids = [r["id"] for r in filas]
+    counts = _commitments_por_request(ids)
+    sumas = _comprometido_por_request(ids)
     for r in filas:
         r["n_compromisos"] = counts.get(r["id"], 0)
+        r["objetivo"] = parse_num(r["cantidad"])
+        r["comprometido"] = sumas.get(r["id"], 0)
     return filas
 
 
@@ -282,7 +333,12 @@ def obtener_request(request_id: int) -> dict | None:
         .select_from(j).where(requests.c.id == request_id)
     with engine.connect() as con:
         r = con.execute(stmt).first()
-        return dict(r._mapping) if r else None
+        if not r:
+            return None
+        d = dict(r._mapping)
+    d["objetivo"] = parse_num(d["cantidad"])
+    d["comprometido"] = _comprometido_por_request([request_id]).get(request_id, 0)
+    return d
 
 
 def cambiar_estado_request(request_id: int, estado: str) -> None:
@@ -330,6 +386,21 @@ def _commitments_por_request(ids: list[int]) -> dict[int, int]:
             .group_by(commitments.c.request_id))
     with engine.connect() as con:
         return {row[0]: row[1] for row in con.execute(stmt)}
+
+
+def _comprometido_por_request(ids: list[int]) -> dict[int, int]:
+    """Suma las cantidades numericas comprometidas por cada request (texto libre)."""
+    if not ids:
+        return {}
+    stmt = (select(commitments.c.request_id, commitments.c.cantidad)
+            .where(commitments.c.request_id.in_(ids)))
+    sumas: dict[int, int] = {}
+    with engine.connect() as con:
+        for rid, cant in con.execute(stmt):
+            n = parse_num(cant)
+            if n:
+                sumas[rid] = sumas.get(rid, 0) + n
+    return sumas
 
 
 # --- Personas (pacientes que el capitan registra) --------------------------

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "base.html" import semaforo_badge, estado_badge, prioridad_badge %}
+{% from "base.html" import semaforo_badge, estado_badge, prioridad_badge, frescura, whatsapp %}
 {% block title %}{{ h.nombre }} — Red de Información Hospitales e Insumos{% endblock %}
 {% block content %}
 
@@ -45,13 +45,21 @@
         <div class="font-semibold">{{ h.en_terapia_intensiva }}</div>
       </div>
     </div>
-    <p class="text-xs text-slate-400 mt-3">Última actualización: {{ h.ultima_actualizacion }} (UTC)</p>
+    <div class="mt-3 flex flex-wrap items-center gap-2">
+      {{ frescura(h.ultima_actualizacion) }}
+      <span class="text-xs text-slate-400">· Reportado por el capitán de este hospital</span>
+    </div>
   {% else %}
     <div class="mt-5 bg-slate-50 border border-slate-200 rounded-lg p-4 text-center text-slate-500">
       <p class="font-semibold">Sin información todavía</p>
       <p class="text-sm mt-1">El capitán de este hospital aún no ha reportado su estado ni sus necesidades.</p>
     </div>
   {% endif %}
+
+  <div class="mt-4">
+    {% set msg = '🏥 ' ~ h.nombre ~ (', ' ~ h.municipio if h.municipio else '') ~ '. Mira su estado y sus necesidades, y ayuda aquí: ' ~ PUBLIC_BASE_URL ~ '/hospital/' ~ h.id %}
+    {{ whatsapp(msg) }}
+  </div>
 </div>
 
 <h2 class="text-lg font-bold text-slate-900 mt-6 mb-3">Necesidades</h2>

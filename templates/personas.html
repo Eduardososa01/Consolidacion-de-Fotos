@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "base.html" import frescura %}
 {% block title %}Personas — Red de Información Hospitales e Insumos{% endblock %}
 {% block content %}
 
@@ -50,6 +51,7 @@
           {% if p.edad %} · {{ p.edad }}{% endif %}
           {% if p.estado %} · {{ p.estado }}{% endif %}
         </p>
+        <div class="mt-1">{{ frescura(p.creado_en, 'Registrado') }}</div>
       </a>
     {% endfor %}
   </div>
