@@ -16,7 +16,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import jinja2
-from fastapi import FastAPI, File, Form, Request, UploadFile
+from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -24,7 +24,6 @@ from starlette.middleware.sessions import SessionMiddleware
 import auth
 import config
 import db
-import extraccion
 
 BASE = Path(__file__).parent
 
@@ -263,31 +262,6 @@ def panel_persona_nuevo(request: Request, nombre: str = Form(""),
                      cedula.strip(), tipo_sangre.strip(), edad.strip(),
                      sexo.strip(), estado.strip(), observaciones.strip())
     return RedirectResponse("/panel?ok=persona", status_code=303)
-
-
-@app.post("/panel/persona/lista")
-async def panel_persona_lista(request: Request, foto: UploadFile = File(...)):
-    cap = auth.capitan_actual(request)
-    if not cap:
-        return RedirectResponse("/entrar", status_code=303)
-    if not extraccion.hay_api():
-        return RedirectResponse("/panel?ok=sinapi", status_code=303)
-    ext = Path(foto.filename or "").suffix.lower()
-    if ext not in extraccion.EXTENSIONES_IMAGEN:
-        return RedirectResponse("/panel?ok=noimg", status_code=303)
-    datos = await foto.read()
-    try:
-        lista = extraccion.extraer_personas(datos, extraccion.MEDIA_TYPES[ext])
-    except Exception:  # noqa: BLE001
-        return RedirectResponse("/panel?ok=errlista", status_code=303)
-    n = 0
-    for p in lista.personas:
-        if p.nombre.strip():
-            db.crear_patient(cap["hospital_id"], p.nombre.strip(), "",
-                             p.cedula.strip(), "", "", "", "",
-                             "Importado de una lista")
-            n += 1
-    return RedirectResponse(f"/panel?ok=lista&n={n}", status_code=303)
 
 
 @app.post("/panel/request/{request_id}/estado")

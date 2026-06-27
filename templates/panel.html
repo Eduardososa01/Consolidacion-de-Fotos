@@ -15,10 +15,6 @@
 {% if ok == 'request' %}<div class="bg-green-100 border border-green-300 text-green-800 rounded-lg px-4 py-2 mt-3 text-sm">Necesidad publicada.</div>{% endif %}
 {% if ok == 'estado_req' %}<div class="bg-green-100 border border-green-300 text-green-800 rounded-lg px-4 py-2 mt-3 text-sm">Estado de la necesidad actualizado.</div>{% endif %}
 {% if ok == 'persona' %}<div class="bg-green-100 border border-green-300 text-green-800 rounded-lg px-4 py-2 mt-3 text-sm">Persona publicada.</div>{% endif %}
-{% if ok == 'lista' %}<div class="bg-green-100 border border-green-300 text-green-800 rounded-lg px-4 py-2 mt-3 text-sm">Lista leída: se agregaron {{ n }} persona(s).</div>{% endif %}
-{% if ok == 'sinapi' %}<div class="bg-amber-100 border border-amber-300 text-amber-800 rounded-lg px-4 py-2 mt-3 text-sm">No se pudo leer la lista: falta configurar la clave de visión (ANTHROPIC_API_KEY) en el servidor.</div>{% endif %}
-{% if ok == 'noimg' %}<div class="bg-red-100 border border-red-300 text-red-800 rounded-lg px-4 py-2 mt-3 text-sm">El archivo no es una imagen válida.</div>{% endif %}
-{% if ok == 'errlista' %}<div class="bg-red-100 border border-red-300 text-red-800 rounded-lg px-4 py-2 mt-3 text-sm">Hubo un error al leer la lista. Intenta con otra foto.</div>{% endif %}
 {% if ok == 'del_persona' %}<div class="bg-slate-200 border border-slate-300 text-slate-700 rounded-lg px-4 py-2 mt-3 text-sm">Persona eliminada.</div>{% endif %}
 {% if ok == 'del_req' %}<div class="bg-slate-200 border border-slate-300 text-slate-700 rounded-lg px-4 py-2 mt-3 text-sm">Necesidad eliminada.</div>{% endif %}
 
@@ -144,23 +140,6 @@
               class="w-full rounded-lg border border-slate-300 px-3 py-2"></textarea>
     <button class="bg-slate-900 hover:bg-slate-800 text-white font-semibold px-4 py-2 rounded-lg">Publicar persona</button>
   </form>
-
-  <div class="border-t border-slate-100 mt-4 pt-4">
-    <h3 class="font-semibold text-slate-900 text-sm mb-1">O sube la foto de una lista</h3>
-    <p class="text-xs text-slate-500 mb-3">
-      Sube la foto de una lista del hospital y se leen los nombres automáticamente
-      para agregarlos a Personas.
-    </p>
-    <form method="post" action="/panel/persona/lista" enctype="multipart/form-data"
-          class="flex flex-wrap items-center gap-2 text-sm">
-      <input type="file" name="foto" accept="image/*" required
-             class="text-sm border border-slate-300 rounded-lg px-3 py-2">
-      <button class="bg-slate-700 hover:bg-slate-600 text-white font-semibold px-4 py-2 rounded-lg">
-        Leer lista
-      </button>
-    </form>
-    <p class="text-xs text-slate-400 mt-2">Leer una lista puede tardar unos segundos.</p>
-  </div>
 </section>
 
 <!-- Personas publicadas -->
