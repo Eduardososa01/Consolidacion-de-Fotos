@@ -3,29 +3,64 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Reconexión{% endblock %}</title>
+  <title>{% block title %}Coordinación de Ayuda{% endblock %}</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
   <header class="bg-slate-900 text-white">
-    <div class="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
       <a href="/" class="flex items-center gap-2 font-bold text-lg">
-        <span class="text-red-400">✚</span> Reconexión
+        <span class="text-red-400">✚</span> Coordinación de Ayuda
       </a>
-      <a href="/subir"
-         class="bg-red-500 hover:bg-red-600 text-white font-semibold px-4 py-2 rounded-lg text-sm">
-        Subir foto de lista
-      </a>
+      <nav class="flex items-center gap-2 text-sm">
+        <a href="/" class="px-3 py-2 rounded-lg hover:bg-slate-800">Hospitales</a>
+        <a href="/necesidades" class="px-3 py-2 rounded-lg hover:bg-slate-800">Necesidades</a>
+        {% if capitan %}
+          <a href="/panel" class="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Mi panel</a>
+          <a href="/salir" class="px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-300">Salir</a>
+        {% else %}
+          <a href="/entrar" class="px-3 py-2 rounded-lg bg-red-500 hover:bg-red-600 font-semibold">Soy capitán</a>
+        {% endif %}
+      </nav>
     </div>
   </header>
 
-  <main class="flex-1 max-w-5xl w-full mx-auto px-4 py-6">
+  <main class="flex-1 max-w-6xl w-full mx-auto px-4 py-6">
     {% block content %}{% endblock %}
   </main>
 
   <footer class="text-center text-xs text-slate-500 py-6 px-4">
-    Plataforma para reconectar personas encontradas en hospitales con sus familias.
-    Prototipo — verifica siempre la información directamente en el hospital.
+    Plataforma de coordinación de ayuda humanitaria en hospitales · Información
+    publicada por capitanes de cada hospital. Verifica siempre antes de actuar.
   </footer>
 </body>
 </html>
+
+{# ---- Macros reutilizables: colores de semáforo / estados ---- #}
+{% macro semaforo_badge(valor) -%}
+  {% set colores = {'critico':'bg-red-100 text-red-800 border-red-300',
+                    'estable':'bg-green-100 text-green-800 border-green-300',
+                    'saturado':'bg-amber-100 text-amber-800 border-amber-300'} %}
+  <span class="text-xs font-semibold px-2 py-1 rounded-full border {{ colores.get(valor,'bg-slate-100 text-slate-700 border-slate-300') }}">
+    {{ ETIQUETAS.get(valor, valor) }}
+  </span>
+{%- endmacro %}
+
+{% macro estado_badge(valor) -%}
+  {% set colores = {'pendiente':'bg-slate-100 text-slate-700 border-slate-300',
+                    'en_camino':'bg-blue-100 text-blue-800 border-blue-300',
+                    'recibido':'bg-indigo-100 text-indigo-800 border-indigo-300',
+                    'completado':'bg-green-100 text-green-800 border-green-300'} %}
+  <span class="text-xs font-semibold px-2 py-1 rounded-full border {{ colores.get(valor,'') }}">
+    {{ ETIQUETAS.get(valor, valor) }}
+  </span>
+{%- endmacro %}
+
+{% macro prioridad_badge(valor) -%}
+  {% set colores = {'alta':'bg-red-100 text-red-800 border-red-300',
+                    'media':'bg-amber-100 text-amber-800 border-amber-300',
+                    'baja':'bg-slate-100 text-slate-600 border-slate-300'} %}
+  <span class="text-xs font-semibold px-2 py-1 rounded-full border {{ colores.get(valor,'') }}">
+    Prioridad {{ ETIQUETAS.get(valor, valor) }}
+  </span>
+{%- endmacro %}

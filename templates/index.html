@@ -1,78 +1,73 @@
 {% extends "base.html" %}
+{% from "base.html" import semaforo_badge %}
 {% block content %}
 
-<section class="text-center py-6">
-  <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">
-    ¿Buscas a un familiar?
-  </h1>
+<section class="text-center py-4">
+  <h1 class="text-2xl sm:text-3xl font-bold text-slate-900">Hospitales y sus necesidades</h1>
   <p class="mt-2 text-slate-600 max-w-2xl mx-auto">
-    Hospitales y voluntarios suben aquí las listas de personas ingresadas.
-    Escribe el nombre o la cédula de tu familiar para ver si está registrado.
+    Estado de cada hospital en tiempo real. Entra a un hospital para ver qué necesita
+    y comprometerte a ayudar.
   </p>
-
-  <form action="/" method="get" class="mt-5 max-w-2xl mx-auto">
-    <div class="flex gap-2">
-      <input type="text" name="q" value="{{ q }}" autofocus
-             placeholder="Buscar por nombre o cédula…"
-             class="flex-1 rounded-lg border border-slate-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-red-400">
-      <button class="bg-slate-900 hover:bg-slate-800 text-white font-semibold px-6 rounded-lg">
-        Buscar
-      </button>
-    </div>
-    <div class="flex flex-wrap gap-2 mt-2 justify-center text-sm">
-      <input type="text" name="hospital" value="{{ hospital }}" placeholder="Hospital"
-             class="rounded-lg border border-slate-300 px-3 py-2">
-      <input type="text" name="ciudad" value="{{ ciudad }}" placeholder="Ciudad"
-             class="rounded-lg border border-slate-300 px-3 py-2">
-    </div>
-  </form>
-
-  <p class="mt-3 text-xs text-slate-500">
-    {{ stats.personas }} persona(s) registradas · {{ stats.listas }} lista(s) subidas
-  </p>
+  <div class="flex justify-center gap-3 mt-4 text-sm">
+    <span class="bg-white border border-slate-200 rounded-lg px-3 py-2">
+      <strong>{{ resumen.hospitales }}</strong> hospitales
+    </span>
+    <span class="bg-white border border-slate-200 rounded-lg px-3 py-2">
+      <strong>{{ resumen.necesidades_activas }}</strong> necesidades activas
+    </span>
+    <span class="bg-red-50 border border-red-200 text-red-800 rounded-lg px-3 py-2">
+      <strong>{{ resumen.hospitales_criticos }}</strong> en estado crítico
+    </span>
+  </div>
 </section>
 
-<section class="mt-2">
-  {% if busco %}
-    <h2 class="text-sm font-semibold text-slate-500 mb-3">
-      {{ resultados|length }} resultado(s)
-    </h2>
-  {% else %}
-    <h2 class="text-sm font-semibold text-slate-500 mb-3">Últimos registros</h2>
+<form method="get" class="flex flex-wrap gap-2 justify-center my-4 text-sm">
+  <select name="municipio" class="rounded-lg border border-slate-300 px-3 py-2">
+    <option value="">Todos los municipios</option>
+    {% for m in municipios %}
+      <option value="{{ m }}" {% if m == f_municipio %}selected{% endif %}>{{ m }}</option>
+    {% endfor %}
+  </select>
+  <select name="semaforo" class="rounded-lg border border-slate-300 px-3 py-2">
+    <option value="">Cualquier estado de insumos</option>
+    {% for s in SEMAFOROS %}
+      <option value="{{ s }}" {% if s == f_semaforo %}selected{% endif %}>{{ ETIQUETAS.get(s) }}</option>
+    {% endfor %}
+  </select>
+  <button class="bg-slate-900 text-white px-4 py-2 rounded-lg font-semibold">Filtrar</button>
+  {% if f_municipio or f_semaforo %}
+    <a href="/" class="px-4 py-2 rounded-lg border border-slate-300">Limpiar</a>
   {% endif %}
+</form>
 
-  {% if resultados %}
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {% for p in resultados %}
-        <a href="/persona/{{ p.id }}"
-           class="bg-white rounded-xl shadow-sm hover:shadow-md transition overflow-hidden border border-slate-200">
-          <img src="/foto/{{ p.registro_id }}" alt="foto" loading="lazy"
-               class="w-full h-44 object-cover bg-slate-200">
-          <div class="p-3">
-            <p class="font-semibold text-slate-900">
-              {{ p.nombre if p.nombre else "(sin nombre)" }}
-            </p>
-            {% if p.cedula %}<p class="text-xs text-slate-500">C.I. {{ p.cedula }}</p>{% endif %}
-            {% if p.hospital %}<p class="text-sm text-slate-600 mt-1">{{ p.hospital }}</p>{% endif %}
-            <p class="text-xs text-slate-400 mt-1">
-              {% if p.ciudad %}{{ p.ciudad }} · {% endif %}
-              {% if p.tipo == 'lista' %}de una lista{% else %}persona encontrada{% endif %}
-            </p>
-          </div>
-        </a>
-      {% endfor %}
-    </div>
-  {% else %}
-    <div class="text-center text-slate-500 py-10">
-      {% if busco %}
-        No se encontró a nadie con esos datos.
-        <p class="text-sm mt-1">Prueba con menos letras del nombre o revisa la ortografía.</p>
-      {% else %}
-        Aún no hay registros. Sé el primero en
-        <a href="/subir" class="text-red-600 underline">subir una lista</a>.
-      {% endif %}
-    </div>
-  {% endif %}
-</section>
+{% if hospitales %}
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for h in hospitales %}
+      <a href="/hospital/{{ h.id }}"
+         class="bg-white rounded-xl border border-slate-200 hover:shadow-md transition p-4 block">
+        <div class="flex items-start justify-between gap-2">
+          <h2 class="font-semibold text-slate-900 leading-tight">{{ h.nombre }}</h2>
+          {{ semaforo_badge(h.semaforo_insumos) }}
+        </div>
+        <p class="text-sm text-slate-500 mt-1">
+          {{ h.municipio }}{% if h.sector %} · {{ h.sector }}{% endif %}
+        </p>
+        <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600 mt-3">
+          <span>Capacidad: <strong>{{ ETIQUETAS.get(h.capacidad) }}</strong></span>
+          <span>Recibe: <strong>{{ ETIQUETAS.get(h.recibiendo_pacientes) }}</strong></span>
+        </div>
+        <div class="mt-3 text-sm">
+          {% if h.requests_activos %}
+            <span class="text-red-600 font-semibold">{{ h.requests_activos }} necesidad(es) activa(s) →</span>
+          {% else %}
+            <span class="text-slate-400">Sin necesidades activas</span>
+          {% endif %}
+        </div>
+      </a>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="text-center text-slate-500 py-10">No hay hospitales que coincidan con el filtro.</p>
+{% endif %}
 
 {% endblock %}

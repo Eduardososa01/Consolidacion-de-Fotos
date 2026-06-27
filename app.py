@@ -1,14 +1,13 @@
 """
-Plataforma "Reconexion" — personas encontradas -> familias.
+Plataforma de coordinacion de ayuda humanitaria en hospitales.
 
-Cualquiera puede:
-  - subir la FOTO DE UNA LISTA de hospital (se extraen los nombres con vision de Claude), o
-  - subir la foto de UNA PERSONA encontrada con sus datos.
-Las familias buscan por nombre o cedula para ver si su familiar esta registrado.
+- Publico: ve hospitales, su estado y las necesidades (requests) en tiempo real,
+  y se compromete a enviar insumos (sin cuenta).
+- Capitanes: una cuenta por hospital; actualizan el estado del hospital y
+  gestionan los requests y sus estados.
 
-Las fotos y los datos se guardan en la base de datos (SQLite en local, Postgres en
-produccion). Correr en local:
-    $env:ANTHROPIC_API_KEY = "tu-clave"
+Correr en local:
+    py seed.py                  # crea hospitales y capitanes (una vez)
     py -m uvicorn app:app --reload
 """
 
@@ -16,19 +15,20 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import anthropic
 import jinja2
-from fastapi import FastAPI, Form, Request, UploadFile, File
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi import FastAPI, Form, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
 
+import auth
 import config
 import db
-from extraccion import EXTENSIONES_IMAGEN, extraer_pizarra
 
 BASE = Path(__file__).parent
 
-app = FastAPI(title="Reconexion")
+app = FastAPI(title="Coordinacion de ayuda")
+app.add_middleware(SessionMiddleware, secret_key=config.SECRET_KEY)
 
 # cache_size=0 evita un bug del cache de plantillas de Jinja2 en Python 3.14.
 _jinja_env = jinja2.Environment(
@@ -36,94 +36,158 @@ _jinja_env = jinja2.Environment(
     autoescape=jinja2.select_autoescape(["html", "xml"]),
     cache_size=0,
 )
+# Exponer etiquetas y catalogos a las plantillas.
+_jinja_env.globals.update(
+    ETIQUETAS=db.ETIQUETAS, INSUMOS=db.INSUMOS, PRIORIDADES=db.PRIORIDADES,
+    ESTADOS=db.ESTADOS, SEMAFOROS=db.SEMAFOROS, RECIBIENDO=db.RECIBIENDO,
+    CAPACIDADES=db.CAPACIDADES,
+)
 templates = Jinja2Templates(env=_jinja_env)
 
-# Crear las tablas al arrancar (idempotente).
 db.crear_tablas()
 
 
-def _cliente_anthropic() -> anthropic.Anthropic | None:
-    if not config.ANTHROPIC_API_KEY:
-        return None
-    return anthropic.Anthropic()
+def _ctx(request: Request, **extra) -> dict:
+    """Contexto base: incluye el capitan logueado (o None) para el nav."""
+    extra["capitan"] = auth.capitan_actual(request)
+    return extra
 
+
+# ===================== PUBLICO =====================
 
 @app.get("/", response_class=HTMLResponse)
-def inicio(request: Request, q: str = "", hospital: str = "", ciudad: str = ""):
-    busco = bool(q or hospital or ciudad)
-    resultados = db.buscar(q=q, hospital=hospital, ciudad=ciudad)
-    stats = db.contar()
-    return templates.TemplateResponse(request, "index.html", {
-        "resultados": resultados, "q": q, "hospital": hospital,
-        "ciudad": ciudad, "busco": busco, "stats": stats,
-    })
+def inicio(request: Request, municipio: str = "", semaforo: str = ""):
+    hosp = db.listar_hospitales(municipio=municipio, semaforo=semaforo)
+    return templates.TemplateResponse(request, "index.html", _ctx(
+        request, hospitales=hosp, resumen=db.resumen(), municipios=db.municipios(),
+        f_municipio=municipio, f_semaforo=semaforo,
+    ))
 
 
-@app.get("/subir", response_class=HTMLResponse)
-def subir_form(request: Request):
-    return templates.TemplateResponse(request, "subir.html", {})
-
-
-@app.post("/subir", response_class=HTMLResponse)
-async def subir(
-    request: Request,
-    tipo: str = Form(...),
-    foto: UploadFile = File(...),
-    nombre: str = Form(""),
-    cedula: str = Form(""),
-    hospital: str = Form(""),
-    ciudad: str = Form(""),
-    fecha: str = Form(""),
-    observaciones: str = Form(""),
-):
-    ext = Path(foto.filename or "").suffix.lower()
-    if ext not in EXTENSIONES_IMAGEN:
-        return templates.TemplateResponse(request, "subir.html", {
-            "error": "El archivo no es una imagen valida (jpg, png, webp...).",
-        })
-    datos = await foto.read()
-
-    if tipo == "lista":
-        cliente = _cliente_anthropic()
-        if cliente is None:
-            return templates.TemplateResponse(request, "subir.html", {
-                "error": "Falta configurar ANTHROPIC_API_KEY en el servidor "
-                         "para poder leer los nombres de la lista.",
-            })
-        # Escribir la imagen a un archivo temporal para reusar extraer_pizarra.
-        import tempfile
-        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
-            tmp.write(datos)
-            tmp_path = tmp.name
-        try:
-            pizarra = extraer_pizarra(cliente, tmp_path)
-        finally:
-            Path(tmp_path).unlink(missing_ok=True)
-        _, n = db.guardar_lista(datos, pizarra, ciudad=ciudad)
-        mensaje = f"Lista subida: se extrajeron {n} persona(s)."
-        if pizarra.lista_incompleta:
-            mensaje += " Aviso: la foto parece recortada; podria faltar gente."
-    else:
-        db.guardar_persona(datos, nombre=nombre, cedula=cedula, hospital=hospital,
-                           ciudad=ciudad, fecha=fecha, observaciones=observaciones)
-        mensaje = "Persona registrada."
-
-    return templates.TemplateResponse(request, "subir.html", {"mensaje": mensaje})
-
-
-@app.get("/foto/{registro_id}")
-def foto(registro_id: int):
-    res = db.obtener_foto(registro_id)
-    if res is None:
-        return Response(status_code=404)
-    datos, mime = res
-    return Response(content=datos, media_type=mime,
-                    headers={"Cache-Control": "public, max-age=86400"})
-
-
-@app.get("/persona/{persona_id}", response_class=HTMLResponse)
-def detalle(request: Request, persona_id: int):
-    persona = db.obtener_persona(persona_id)
-    if persona is None:
+@app.get("/hospital/{hospital_id}", response_class=HTMLResponse)
+def hospital(request: Request, hospital_id: int):
+    h = db.obtener_hospital(hospital_id)
+    if not h:
         return RedirectResponse("/", status_code=303)
-    return templates.TemplateResponse(request, "persona.html", {"p": persona})
+    reqs = db.listar_requests(hospital_id=hospital_id)
+    return templates.TemplateResponse(request, "hospital.html",
+                                      _ctx(request, h=h, requests=reqs))
+
+
+@app.get("/necesidades", response_class=HTMLResponse)
+def necesidades(request: Request, municipio: str = "", tipo: str = "",
+                prioridad: str = "", estado: str = ""):
+    reqs = db.listar_requests(municipio=municipio, tipo=tipo,
+                              prioridad=prioridad, estado=estado)
+    return templates.TemplateResponse(request, "necesidades.html", _ctx(
+        request, requests=reqs, municipios=db.municipios(),
+        f_municipio=municipio, f_tipo=tipo, f_prioridad=prioridad, f_estado=estado,
+    ))
+
+
+@app.get("/necesidad/{request_id}", response_class=HTMLResponse)
+def necesidad(request: Request, request_id: int, ok: int = 0):
+    r = db.obtener_request(request_id)
+    if not r:
+        return RedirectResponse("/necesidades", status_code=303)
+    comp = db.listar_commitments(request_id)
+    return templates.TemplateResponse(request, "necesidad.html",
+                                      _ctx(request, r=r, compromisos=comp, ok=ok))
+
+
+@app.post("/necesidad/{request_id}/ayudar")
+def ayudar(request: Request, request_id: int,
+           nombre_donante: str = Form(""), que_envia: str = Form(""),
+           cantidad: str = Form(""), hora_estimada: str = Form(""),
+           comentario: str = Form("")):
+    if db.obtener_request(request_id):
+        db.crear_commitment(request_id, nombre_donante, que_envia, cantidad,
+                            hora_estimada, comentario)
+    return RedirectResponse(f"/necesidad/{request_id}?ok=1", status_code=303)
+
+
+# ===================== CAPITAN: login =====================
+
+@app.get("/entrar", response_class=HTMLResponse)
+def entrar_form(request: Request, error: int = 0):
+    if auth.capitan_actual(request):
+        return RedirectResponse("/panel", status_code=303)
+    return templates.TemplateResponse(request, "entrar.html", _ctx(request, error=error))
+
+
+@app.post("/entrar")
+def entrar(request: Request, usuario: str = Form(...), clave: str = Form(...)):
+    datos = auth.autenticar(usuario, clave)
+    if not datos:
+        return RedirectResponse("/entrar?error=1", status_code=303)
+    request.session["captain_id"] = datos["captain_id"]
+    request.session["hospital_id"] = datos["hospital_id"]
+    request.session["usuario"] = datos["usuario"]
+    return RedirectResponse("/panel", status_code=303)
+
+
+@app.get("/salir")
+def salir(request: Request):
+    request.session.clear()
+    return RedirectResponse("/", status_code=303)
+
+
+# ===================== CAPITAN: panel =====================
+
+@app.get("/panel", response_class=HTMLResponse)
+def panel(request: Request, ok: str = ""):
+    cap = auth.capitan_actual(request)
+    if not cap:
+        return RedirectResponse("/entrar", status_code=303)
+    h = db.obtener_hospital(cap["hospital_id"])
+    reqs = db.listar_requests(hospital_id=cap["hospital_id"])
+    # compromisos por cada request (para que el capitan los vea)
+    comp = {r["id"]: db.listar_commitments(r["id"]) for r in reqs}
+    return templates.TemplateResponse(request, "panel.html",
+                                      _ctx(request, h=h, requests=reqs,
+                                           compromisos=comp, ok=ok))
+
+
+@app.post("/panel/estado")
+def panel_estado(request: Request,
+                 semaforo_insumos: str = Form(...), recibiendo_pacientes: str = Form(...),
+                 capacidad: str = Form(...), heridos_activos: str = Form("N/D"),
+                 es_estimado_heridos: str = Form(""), fallecidos: str = Form("N/D"),
+                 en_terapia_intensiva: str = Form("N/D")):
+    cap = auth.capitan_actual(request)
+    if not cap:
+        return RedirectResponse("/entrar", status_code=303)
+    db.actualizar_estado_hospital(cap["hospital_id"], {
+        "semaforo_insumos": semaforo_insumos,
+        "recibiendo_pacientes": recibiendo_pacientes,
+        "capacidad": capacidad,
+        "heridos_activos": heridos_activos.strip() or "N/D",
+        "es_estimado_heridos": bool(es_estimado_heridos),
+        "fallecidos": fallecidos.strip() or "N/D",
+        "en_terapia_intensiva": en_terapia_intensiva.strip() or "N/D",
+    })
+    return RedirectResponse("/panel?ok=estado", status_code=303)
+
+
+@app.post("/panel/request/nuevo")
+def panel_request_nuevo(request: Request, tipo_insumo: str = Form(...),
+                        descripcion: str = Form(""), cantidad: str = Form(""),
+                        prioridad: str = Form("media")):
+    cap = auth.capitan_actual(request)
+    if not cap:
+        return RedirectResponse("/entrar", status_code=303)
+    db.crear_request(cap["hospital_id"], tipo_insumo.strip(), descripcion.strip(),
+                     cantidad.strip(), prioridad)
+    return RedirectResponse("/panel?ok=request", status_code=303)
+
+
+@app.post("/panel/request/{request_id}/estado")
+def panel_request_estado(request: Request, request_id: int, estado: str = Form(...)):
+    cap = auth.capitan_actual(request)
+    if not cap:
+        return RedirectResponse("/entrar", status_code=303)
+    r = db.obtener_request(request_id)
+    # solo el capitan dueno del hospital puede cambiar su request
+    if r and r["hospital_id"] == cap["hospital_id"] and estado in db.ESTADOS:
+        db.cambiar_estado_request(request_id, estado)
+    return RedirectResponse("/panel?ok=estado_req", status_code=303)

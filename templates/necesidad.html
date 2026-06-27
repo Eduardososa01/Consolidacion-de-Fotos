@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% from "base.html" import estado_badge, prioridad_badge %}
+{% block title %}{{ r.tipo_insumo }} — {{ r.hospital_nombre }}{% endblock %}
+{% block content %}
+
+<a href="/necesidades" class="text-sm text-slate-500 hover:underline">← Todas las necesidades</a>
+
+{% if ok %}
+  <div class="mt-3 bg-green-100 border border-green-300 text-green-800 rounded-lg px-4 py-3 text-sm">
+    ¡Gracias! Tu compromiso quedó registrado. El hospital lo verá y confirmará la recepción cuando llegue.
+  </div>
+{% endif %}
+
+<div class="mt-3 bg-white rounded-xl border border-slate-200 p-5">
+  <div class="flex flex-wrap items-start justify-between gap-2">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-900">{{ r.tipo_insumo }}</h1>
+      <a href="/hospital/{{ r.hospital_id }}" class="text-slate-600 hover:underline">
+        {{ r.hospital_nombre }}</a>
+      {% if r.municipio %}<span class="text-slate-400">· {{ r.municipio }}</span>{% endif %}
+    </div>
+    <div class="flex gap-2">{{ prioridad_badge(r.prioridad) }}{{ estado_badge(r.estado) }}</div>
+  </div>
+  <dl class="mt-4 space-y-1 text-sm">
+    {% if r.cantidad %}<div><dt class="font-semibold inline">Cantidad:</dt> {{ r.cantidad }}</div>{% endif %}
+    {% if r.descripcion %}<div><dt class="font-semibold inline">Detalle:</dt> {{ r.descripcion }}</div>{% endif %}
+    {% if r.hospital_telefono %}<div><dt class="font-semibold inline">Tel. hospital:</dt> {{ r.hospital_telefono }}</div>{% endif %}
+    <div class="text-slate-400">Publicado: {{ r.creado_en }} (UTC)</div>
+  </dl>
+</div>
+
+{% if r.estado != 'completado' %}
+<div class="mt-5 bg-white rounded-xl border border-slate-200 p-5">
+  <h2 class="font-bold text-slate-900 mb-1">Quiero ayudar</h2>
+  <p class="text-sm text-slate-500 mb-4">Indica qué puedes enviar. No necesitas cuenta.</p>
+  <form method="post" action="/necesidad/{{ r.id }}/ayudar" class="space-y-3">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <input type="text" name="nombre_donante" required placeholder="Tu nombre"
+             class="rounded-lg border border-slate-300 px-3 py-2">
+      <input type="text" name="que_envia" placeholder="Qué vas a enviar"
+             class="rounded-lg border border-slate-300 px-3 py-2">
+      <input type="text" name="cantidad" placeholder="Cantidad"
+             class="rounded-lg border border-slate-300 px-3 py-2">
+      <input type="text" name="hora_estimada" placeholder="Hora estimada de llegada"
+             class="rounded-lg border border-slate-300 px-3 py-2">
+    </div>
+    <textarea name="comentario" rows="2" placeholder="Comentario (opcional)"
+              class="w-full rounded-lg border border-slate-300 px-3 py-2"></textarea>
+    <button class="bg-red-500 hover:bg-red-600 text-white font-semibold px-5 py-2 rounded-lg">
+      Me comprometo a enviar esto
+    </button>
+  </form>
+</div>
+{% endif %}
+
+<h2 class="text-lg font-bold text-slate-900 mt-6 mb-3">
+  Personas ayudando ({{ compromisos|length }})
+</h2>
+{% if compromisos %}
+  <div class="space-y-2">
+    {% for c in compromisos %}
+      <div class="bg-white rounded-lg border border-slate-200 p-3 text-sm">
+        <div class="font-semibold text-slate-900">{{ c.nombre_donante or "Anónimo" }}</div>
+        <div class="text-slate-600">
+          {% if c.que_envia %}Envía: {{ c.que_envia }}{% endif %}
+          {% if c.cantidad %} · {{ c.cantidad }}{% endif %}
+          {% if c.hora_estimada %} · llega ~{{ c.hora_estimada }}{% endif %}
+        </div>
+        {% if c.comentario %}<div class="text-slate-500 mt-1">{{ c.comentario }}</div>{% endif %}
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="text-slate-500">Todavía nadie se ha comprometido. ¡Sé el primero!</p>
+{% endif %}
+
+{% endblock %}

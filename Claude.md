@@ -19,46 +19,52 @@ Al finalizar, genera un reporte con el siguiente resumen:
 
 ---
 
-# Plataforma "Reconexión" (objetivo actual)
+# Plataforma de Coordinación de Ayuda Humanitaria (objetivo actual)
 
-Invertimos el modelo: en vez de que las familias reporten desaparecidos,
-**cualquiera sube la foto de una lista de hospital** (se leen los nombres
-automáticamente con la visión de Claude) o la foto de una persona encontrada, y
-**las familias buscan** por nombre o cédula para ver si su familiar está.
+Coordina ayuda en hospitales durante una emergencia. Dos roles:
+- **Capitanes** (1 cuenta por hospital): actualizan el estado del hospital
+  (semáforo de insumos, capacidad, recibe pacientes, cifras de heridos/fallecidos/UCI)
+  y publican **necesidades** (requests de insumos: sangre, antibióticos, etc.).
+- **Público/donantes** (sin cuenta): ven hospitales y necesidades en vivo, filtran,
+  y se **comprometen** a enviar insumos. El capitán confirma la recepción.
+  Estados de cada necesidad: pendiente → en camino → recibido → completado.
 
 ## Cómo correrla
 ```powershell
 cd "c:\Users\Eduardo\OneDrive\Desktop\Consolidacion de fotos"
-$env:ANTHROPIC_API_KEY = "tu-clave"     # necesaria para leer listas
 py -m pip install -r requirements.txt
+py seed.py                          # crea 10 hospitales + capitanes (anota credenciales)
 py -m uvicorn app:app --reload
 # abrir http://127.0.0.1:8000
 ```
 
 ## Archivos
-- `app.py` — servidor web (FastAPI) con las rutas `/`, `/subir`, `/persona/{id}`.
-- `extraccion.py` — lógica de visión reusable (modelos, `extraer_pizarra`, `normalizar`).
-- `db.py` — base de datos SQLite (tablas `registros` y `personas`) + búsqueda.
-- `templates/` — páginas HTML (Tailwind por CDN): `base`, `index`, `subir`, `persona`.
-- `media/` — fotos subidas por la gente (se crea sola).
-- `extraer.py` — CLI opcional para procesar en lote las fotos de `fotos/`.
-- `base_datos.sqlite` — base de datos (se crea sola).
+- `app.py` — servidor web (FastAPI) + sesiones; rutas públicas y de capitán.
+- `db.py` — esquema SQLAlchemy (hospitals, captains, requests, commitments) + consultas.
+- `auth.py` — login de capitanes (hash pbkdf2 + sesión por cookie).
+- `seed.py` — carga inicial de los 10 hospitales y sus capitanes.
+- `config.py` — `DATABASE_URL` (SQLite local / Postgres prod) y `SECRET_KEY`.
+- `templates/` — HTML (Tailwind CDN): base, index, hospital, necesidades, necesidad,
+  entrar, panel.
+- `render.yaml`, `Procfile`, `DESPLIEGUE.md` — despliegue (Render + Supabase).
 - `requirements.txt` — dependencias.
 
 ## Notas técnicas
-- Modelo de visión: `claude-opus-4-8` con salida estructurada (`messages.parse`).
-- Búsqueda por nombre (normalizado, sin acentos/mayúsculas) o por cédula.
-- Almacenamiento: **SQLite + carpeta `media/` local** (decisión para el prototipo).
-  Pendiente opcional: export/respaldo a Google Drive/Sheets para compartir
-  (Sheets NO como motor de búsqueda: lento y con datos sensibles).
+- Auth: capitanes con usuario+contraseña (pbkdf2 stdlib), sesión con SessionMiddleware.
+  Donantes anónimos (solo dejan nombre + comentario al comprometerse).
+- Almacenamiento: SQLite en local, Postgres (Supabase) en producción — mismo código.
 - Jinja2 se inicializa con `cache_size=0` por un bug de cache en Python 3.14.
+- Alcance v1: núcleo de coordinación. *Fuera de v1:* registro de pacientes
+  individuales con foto (los datos de pacientes serían internos).
 
 ## Privacidad (antes de desplegar)
-Maneja datos sensibles de personas vulnerables. Para un prototipo local está bien;
-antes de publicarlo hay que revisar consentimiento, moderación de subidas
-(ahora la subida es abierta) y protección de datos.
+Datos sensibles de una emergencia. Para un prototipo está bien; antes de difundir
+ampliamente conviene revisar quién puede comprometerse/abusar y proteger los datos.
 
-## Trabajo previo (sesión anterior)
-Antes exploramos el cruce contra https://desaparecidosterremotovenezuela.com/
-(su API pide token reCAPTCHA → solo se consulta por el buscador del navegador).
-Quedó el script de extracción y el CSV `lista_hospital_perez_carreno.csv`.
+## Historial del proyecto
+1. (Sesión previa) Extracción de listas de hospitales con visión de Claude + cruce
+   contra https://desaparecidosterremotovenezuela.com/ (su API pide token reCAPTCHA).
+2. Plataforma "Reconexión" (encontrados → familias) — pivote intermedio.
+3. **Actual:** coordinación de ayuda humanitaria (capitanes + necesidades + donaciones).
+Los archivos de la fase 1-2 (extraer.py, extraccion.py, fotos/, CSV) se retiraron del
+flujo activo.

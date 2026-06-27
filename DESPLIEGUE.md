@@ -48,28 +48,44 @@ git push -u origin main
 ## Paso 3 — Desplegar la app en Render
 
 1. Entra a https://render.com → **New → Web Service** → conecta tu GitHub y elige el
-   repo `reconexion`.
+   repo `Consolidacion-de-Fotos`.
 2. Render detecta el `render.yaml`. Si te pide los datos a mano:
    - **Build Command:** `pip install -r requirements.txt`
    - **Start Command:** `uvicorn app:app --host 0.0.0.0 --port $PORT`
    - **Instance type:** Free
-3. En **Environment** agrega dos variables:
-   - `DATABASE_URL` = la cadena de Supabase del Paso 2
-   - `ANTHROPIC_API_KEY` = tu clave de Anthropic
+3. En **Environment** agrega la variable:
+   - `DATABASE_URL` = la cadena de Supabase del Paso 2 (Session pooler)
+   - (`SECRET_KEY` la genera Render solo, por el `render.yaml`.)
 4. **Create Web Service**. En 1–2 minutos te da una URL como
-   `https://reconexion.onrender.com` → **ese es el link** para tus amigos.
+   `https://coordinacion-ayuda.onrender.com` → **ese es el link**.
+
+---
+
+## Paso 4 — Cargar los hospitales (una vez)
+
+La primera vez hay que crear los 10 hospitales y los capitanes en la base. En Render,
+ve a tu servicio → pestaña **Shell** y ejecuta:
+
+```bash
+python seed.py
+```
+
+Esto imprime el **usuario y contraseña de cada capitán** — guárdalos y repártelos a
+cada hospital. (Alternativa: correr `py seed.py` en tu PC apuntando `DATABASE_URL` a
+Supabase.)
 
 ---
 
 ## Listo
 
-- Cualquiera con el link puede **buscar** y **subir** (subida abierta, como pediste).
-- Las fotos y los nombres quedan guardados en Supabase (no se borran).
+- Cualquiera con el link **ve hospitales y necesidades** y puede **comprometerse a
+  ayudar** (sin cuenta).
+- Los **capitanes** entran con su usuario/contraseña y gestionan su hospital.
+- Todo queda guardado en Supabase (no se borra).
 - Para actualizar el sitio: `git push` y Render redepliega solo.
 
 ### Notas
 - En el plan gratis de Render, la app "se duerme" tras un rato sin uso y la **primera
   visita tarda ~30 s** en despertar. Normal.
-- Cada lista que se sube consume tu **cuota de la API** de Anthropic.
-- Antes de compartirlo ampliamente, conviene revisar **privacidad** (son datos de
-  personas vulnerables) y quizá poner una clave para subir.
+- Antes de difundirlo ampliamente, revisa **privacidad** y posible abuso (cualquiera
+  puede comprometerse a donar).

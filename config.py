@@ -26,11 +26,7 @@ elif DATABASE_URL.startswith("postgresql://"):
 
 ES_SQLITE = DATABASE_URL.startswith("sqlite")
 
-# --- API de vision ---------------------------------------------------------
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-
-# --- Imagenes --------------------------------------------------------------
-# Las fotos se guardan dentro de la base de datos (columna binaria), reducidas
-# para que pesen poco. Lado maximo en pixeles y calidad JPEG.
-IMG_LADO_MAX = 1600
-IMG_CALIDAD = 80
+# --- Sesiones (login de capitanes) -----------------------------------------
+# Clave para firmar las cookies de sesion. En produccion se define SECRET_KEY;
+# en local hay un valor por defecto (no usar el default en produccion).
+SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-cambia-esto-en-produccion")

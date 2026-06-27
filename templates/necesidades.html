@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% from "base.html" import estado_badge, prioridad_badge %}
+{% block title %}Necesidades — Coordinación de Ayuda{% endblock %}
+{% block content %}
+
+<h1 class="text-2xl font-bold text-slate-900">Necesidades de los hospitales</h1>
+<p class="text-slate-600 mt-1">Filtra y abre una necesidad para comprometerte a ayudar.</p>
+
+<form method="get" class="flex flex-wrap gap-2 my-4 text-sm">
+  <select name="municipio" class="rounded-lg border border-slate-300 px-3 py-2">
+    <option value="">Todos los municipios</option>
+    {% for m in municipios %}
+      <option value="{{ m }}" {% if m == f_municipio %}selected{% endif %}>{{ m }}</option>
+    {% endfor %}
+  </select>
+  <input type="text" name="tipo" value="{{ f_tipo }}" placeholder="Insumo (ej. sangre)"
+         class="rounded-lg border border-slate-300 px-3 py-2">
+  <select name="prioridad" class="rounded-lg border border-slate-300 px-3 py-2">
+    <option value="">Cualquier prioridad</option>
+    {% for p in PRIORIDADES %}
+      <option value="{{ p }}" {% if p == f_prioridad %}selected{% endif %}>{{ ETIQUETAS.get(p) }}</option>
+    {% endfor %}
+  </select>
+  <select name="estado" class="rounded-lg border border-slate-300 px-3 py-2">
+    <option value="">Cualquier estado</option>
+    {% for e in ESTADOS %}
+      <option value="{{ e }}" {% if e == f_estado %}selected{% endif %}>{{ ETIQUETAS.get(e) }}</option>
+    {% endfor %}
+  </select>
+  <button class="bg-slate-900 text-white px-4 py-2 rounded-lg font-semibold">Filtrar</button>
+  {% if f_municipio or f_tipo or f_prioridad or f_estado %}
+    <a href="/necesidades" class="px-4 py-2 rounded-lg border border-slate-300">Limpiar</a>
+  {% endif %}
+</form>
+
+<p class="text-sm text-slate-500 mb-3">{{ requests|length }} necesidad(es)</p>
+
+{% if requests %}
+  <div class="space-y-3">
+    {% for r in requests %}
+      <a href="/necesidad/{{ r.id }}"
+         class="bg-white rounded-xl border border-slate-200 hover:shadow-md transition p-4 flex flex-wrap items-center justify-between gap-2 block">
+        <div>
+          <div class="font-semibold text-slate-900">{{ r.tipo_insumo }}
+            {% if r.cantidad %}<span class="text-slate-500 font-normal">· {{ r.cantidad }}</span>{% endif %}
+          </div>
+          <div class="text-sm text-slate-500">{{ r.hospital_nombre }}{% if r.municipio %} · {{ r.municipio }}{% endif %}</div>
+          {% if r.n_compromisos %}<div class="text-xs text-blue-600 mt-1">{{ r.n_compromisos }} persona(s) ayudando</div>{% endif %}
+        </div>
+        <div class="flex gap-2 items-center">
+          {{ prioridad_badge(r.prioridad) }}
+          {{ estado_badge(r.estado) }}
+        </div>
+      </a>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="text-center text-slate-500 py-10">No hay necesidades con esos filtros.</p>
+{% endif %}
+
+{% endblock %}
