@@ -18,30 +18,39 @@
     </div>
     <div class="text-right">
       <div class="text-xs text-slate-400 mb-1">Estado de insumos</div>
-      {{ semaforo_badge(h.semaforo_insumos) }}
+      {% if h.ultima_actualizacion %}
+        {{ semaforo_badge(h.semaforo_insumos) }}
+      {% else %}
+        <span class="text-xs font-semibold px-2 py-1 rounded-full border bg-slate-100 text-slate-500 border-slate-300">Sin información</span>
+      {% endif %}
     </div>
   </div>
 
-  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 text-sm">
-    <div class="bg-slate-50 rounded-lg p-3">
-      <div class="text-slate-400 text-xs">Capacidad</div>
-      <div class="font-semibold">{{ ETIQUETAS.get(h.capacidad) }}</div>
-    </div>
-    <div class="bg-slate-50 rounded-lg p-3">
-      <div class="text-slate-400 text-xs">Recibiendo pacientes</div>
-      <div class="font-semibold">{{ ETIQUETAS.get(h.recibiendo_pacientes) }}</div>
-    </div>
-    <div class="bg-slate-50 rounded-lg p-3">
-      <div class="text-slate-400 text-xs">Heridos activos</div>
-      <div class="font-semibold">{{ h.heridos_activos }}{% if h.es_estimado_heridos %} <span class="text-xs text-slate-400">(est.)</span>{% endif %}</div>
-    </div>
-    <div class="bg-slate-50 rounded-lg p-3">
-      <div class="text-slate-400 text-xs">En terapia intensiva</div>
-      <div class="font-semibold">{{ h.en_terapia_intensiva }}</div>
-    </div>
-  </div>
   {% if h.ultima_actualizacion %}
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 text-sm">
+      <div class="bg-slate-50 rounded-lg p-3">
+        <div class="text-slate-400 text-xs">Capacidad</div>
+        <div class="font-semibold">{{ ETIQUETAS.get(h.capacidad) }}</div>
+      </div>
+      <div class="bg-slate-50 rounded-lg p-3">
+        <div class="text-slate-400 text-xs">Recibiendo pacientes</div>
+        <div class="font-semibold">{{ ETIQUETAS.get(h.recibiendo_pacientes) }}</div>
+      </div>
+      <div class="bg-slate-50 rounded-lg p-3">
+        <div class="text-slate-400 text-xs">Heridos activos</div>
+        <div class="font-semibold">{{ h.heridos_activos }}{% if h.es_estimado_heridos %} <span class="text-xs text-slate-400">(est.)</span>{% endif %}</div>
+      </div>
+      <div class="bg-slate-50 rounded-lg p-3">
+        <div class="text-slate-400 text-xs">En terapia intensiva</div>
+        <div class="font-semibold">{{ h.en_terapia_intensiva }}</div>
+      </div>
+    </div>
     <p class="text-xs text-slate-400 mt-3">Última actualización: {{ h.ultima_actualizacion }} (UTC)</p>
+  {% else %}
+    <div class="mt-5 bg-slate-50 border border-slate-200 rounded-lg p-4 text-center text-slate-500">
+      <p class="font-semibold">Sin información todavía</p>
+      <p class="text-sm mt-1">El capitán de este hospital aún no ha reportado su estado ni sus necesidades.</p>
+    </div>
   {% endif %}
 </div>
 
