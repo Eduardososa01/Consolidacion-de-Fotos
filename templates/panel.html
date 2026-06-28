@@ -8,7 +8,10 @@
     <h1 class="text-2xl font-bold text-slate-900">{{ h.nombre }}</h1>
     <p class="text-slate-500 text-sm">Panel del capitán · {{ capitan.usuario }}</p>
   </div>
-  {{ semaforo_badge(h.semaforo_insumos) }}
+  <div class="flex items-center gap-2">
+    <a href="/importar" class="text-sm font-semibold text-slate-700 border border-slate-300 rounded-lg px-3 py-2 hover:bg-slate-50">⬆️ Importar lista (CSV)</a>
+    {{ semaforo_badge(h.semaforo_insumos) }}
+  </div>
 </div>
 
 {% if ok == 'estado' %}<div class="bg-green-100 border border-green-300 text-green-800 rounded-lg px-4 py-2 mt-3 text-sm">Estado actualizado.</div>{% endif %}

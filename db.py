@@ -433,9 +433,9 @@ def crear_patient(hospital_id: int, nombre: str, apellido: str, cedula: str,
         )).inserted_primary_key[0]
 
 
-def crear_patients_bulk(hospital_id: int, personas: list[dict]) -> int:
-    """Inserta MUCHAS personas de una vez (rapido para miles). Cada dict acepta
-    nombre, apellido, cedula, tipo_sangre, edad, sexo, estado, observaciones."""
+def crear_patients_bulk(personas: list[dict]) -> int:
+    """Inserta MUCHAS personas de una vez (rapido para miles). Cada dict debe traer
+    hospital_id y acepta nombre, apellido, cedula, tipo_sangre, edad, sexo, estado, observaciones."""
     if not personas:
         return 0
     t = ahora()
@@ -444,7 +444,7 @@ def crear_patients_bulk(hospital_id: int, personas: list[dict]) -> int:
         nombre = (p.get("nombre") or "").strip()
         apellido = (p.get("apellido") or "").strip()
         filas.append({
-            "hospital_id": hospital_id, "nombre": nombre, "apellido": apellido,
+            "hospital_id": p["hospital_id"], "nombre": nombre, "apellido": apellido,
             "nombre_normalizado": normalizar(f"{nombre} {apellido}"),
             "cedula": (p.get("cedula") or "").strip(),
             "tipo_sangre": (p.get("tipo_sangre") or "").strip(),
@@ -459,6 +459,25 @@ def crear_patients_bulk(hospital_id: int, personas: list[dict]) -> int:
         for i in range(0, len(filas), 500):
             con.execute(patients.insert(), filas[i:i + 500])
     return len(filas)
+
+
+def mapa_hospitales() -> dict[str, int]:
+    """Devuelve {nombre_normalizado: id} de todos los hospitales (para emparejar)."""
+    with engine.connect() as con:
+        rows = con.execute(select(hospitals.c.id, hospitals.c.nombre)).all()
+    return {normalizar(nombre): hid for hid, nombre in rows}
+
+
+def crear_hospital(nombre: str, tipo: str = "publico", municipio: str = "",
+                   sector: str = "", ciudad: str = "") -> int:
+    """Crea un hospital minimo (sin capitan, sin estado reportado). Devuelve su id."""
+    with engine.begin() as con:
+        return con.execute(hospitals.insert().values(
+            nombre=nombre, tipo=tipo, municipio=municipio, sector=sector, ciudad=ciudad,
+            semaforo_insumos="estable", recibiendo_pacientes="si",
+            capacidad="con_capacidad", heridos_activos="N/D", es_estimado_heridos=False,
+            fallecidos="N/D", en_terapia_intensiva="N/D", ultima_actualizacion="",
+        )).inserted_primary_key[0]
 
 
 _PAC_COLS = [

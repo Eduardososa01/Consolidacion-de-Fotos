@@ -178,7 +178,7 @@ def persona(request: Request, patient_id: int):
     return templates.TemplateResponse(request, "persona.html", _ctx(request, p=p))
 
 
-# ===================== IMPORTAR LISTA (CSV) — publico =====================
+# ===================== IMPORTAR LISTA (CSV) — solo capitanes =====================
 
 _ALIAS = {
     "nombre": ["nombre", "nombres", "nombre completo"],
@@ -190,6 +190,8 @@ _ALIAS = {
     "estado": ["estado", "condicion"],
     "observaciones": ["observaciones", "notas", "obs", "comentario", "comentarios"],
     "seccion": ["seccion", "area", "sala"],
+    "hospital": ["hospital", "centro", "hospital centro", "centro de salud",
+                 "hospital/centro", "hospital o centro"],
 }
 MAX_FILAS_IMPORT = 50000
 
@@ -202,17 +204,19 @@ def _val(nrow: dict, claves: list[str]) -> str:
 
 
 @app.get("/importar", response_class=HTMLResponse)
-def importar_form(request: Request, ok: str = "", n: int = 0):
+def importar_form(request: Request, ok: str = "", n: int = 0, h: int = 0):
+    if not auth.capitan_actual(request):
+        return RedirectResponse("/entrar", status_code=303)
     return templates.TemplateResponse(request, "importar.html",
                                       _ctx(request, hospitales=db.listar_hospitales(),
-                                           ok=ok, n=n))
+                                           ok=ok, n=n, h=h))
 
 
 @app.post("/importar")
-async def importar(request: Request, hospital_id: int = Form(...),
+async def importar(request: Request, hospital_id: str = Form(""),
                    archivo: UploadFile = File(...)):
-    if not db.obtener_hospital(hospital_id):
-        return RedirectResponse("/importar?ok=errhosp", status_code=303)
+    if not auth.capitan_actual(request):
+        return RedirectResponse("/entrar", status_code=303)
     datos = await archivo.read()
     try:
         texto = datos.decode("utf-8-sig")
@@ -222,6 +226,33 @@ async def importar(request: Request, hospital_id: int = Form(...),
         filas = list(csv.DictReader(io.StringIO(texto)))
     except Exception:  # noqa: BLE001
         return RedirectResponse("/importar?ok=errcsv", status_code=303)
+
+    # hospital por defecto (opcional): para filas sin columna 'hospital'
+    default_hid = None
+    if hospital_id.strip().isdigit() and db.obtener_hospital(int(hospital_id)):
+        default_hid = int(hospital_id)
+
+    cache = db.mapa_hospitales()   # nombre_normalizado -> id
+    creados = {"n": 0}
+
+    def resolver(nombre_hosp: str) -> int:
+        nombre_hosp = (nombre_hosp or "").strip()
+        if nombre_hosp:
+            norm = db.normalizar(nombre_hosp)
+            if norm in cache:
+                return cache[norm]
+            hid = db.crear_hospital(nombre_hosp)        # crea el que falte
+            cache[norm] = hid
+            creados["n"] += 1
+            return hid
+        if default_hid is not None:
+            return default_hid
+        # ultimo recurso: bolsa "Lista general"
+        norm = db.normalizar("Lista general")
+        if norm not in cache:
+            cache[norm] = db.crear_hospital("Lista general")
+            creados["n"] += 1
+        return cache[norm]
 
     personas = []
     for row in filas[:MAX_FILAS_IMPORT]:
@@ -235,13 +266,14 @@ async def importar(request: Request, hospital_id: int = Form(...),
         if seccion:
             obs = (seccion + " · " + obs).strip(" ·")
         personas.append({
+            "hospital_id": resolver(_val(nrow, _ALIAS["hospital"])),
             "nombre": nombre, "apellido": _val(nrow, _ALIAS["apellido"]),
             "cedula": cedula, "tipo_sangre": _val(nrow, _ALIAS["tipo_sangre"]),
             "edad": _val(nrow, _ALIAS["edad"]), "sexo": _val(nrow, _ALIAS["sexo"]),
             "estado": _val(nrow, _ALIAS["estado"]), "observaciones": obs,
         })
-    n = db.crear_patients_bulk(hospital_id, personas)
-    return RedirectResponse(f"/importar?ok=ok&n={n}", status_code=303)
+    n = db.crear_patients_bulk(personas)
+    return RedirectResponse(f"/importar?ok=ok&n={n}&h={creados['n']}", status_code=303)
 
 
 # ===================== CAPITAN: login =====================

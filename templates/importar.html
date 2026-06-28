@@ -2,22 +2,20 @@
 {% block title %}Importar lista — Red de Información Hospitales e Insumos{% endblock %}
 {% block content %}
 
-<a href="/personas" class="text-sm text-slate-500 hover:underline">← Volver a Personas</a>
+<a href="/panel" class="text-sm text-slate-500 hover:underline">← Volver al panel</a>
 
 <div class="max-w-xl mx-auto mt-3">
   <h1 class="text-2xl font-bold text-slate-900 mb-1">Importar lista de personas (CSV)</h1>
   <p class="text-slate-600 text-sm mb-5">
     Sube un archivo CSV con una lista ya digitalizada y todas las personas se
-    agregan de golpe a la sección <strong>Personas</strong>.
+    agregan de golpe a la sección <strong>Personas</strong>. Solo para capitanes.
   </p>
 
   {% if ok == 'ok' %}
     <div class="bg-green-100 border border-green-300 text-green-800 rounded-lg px-4 py-3 mb-4 text-sm">
-      ✅ Se importaron <strong>{{ n }}</strong> persona(s).
+      ✅ Se importaron <strong>{{ n }}</strong> persona(s){% if h %} y se crearon <strong>{{ h }}</strong> hospital(es) nuevo(s){% endif %}.
       <a href="/personas" class="underline font-semibold">Ver en Personas →</a>
     </div>
-  {% elif ok == 'errhosp' %}
-    <div class="bg-red-100 border border-red-300 text-red-800 rounded-lg px-4 py-3 mb-4 text-sm">Elige un hospital válido.</div>
   {% elif ok == 'errcsv' %}
     <div class="bg-red-100 border border-red-300 text-red-800 rounded-lg px-4 py-3 mb-4 text-sm">No se pudo leer el archivo. Asegúrate de que sea un CSV con encabezados.</div>
   {% endif %}
@@ -25,14 +23,18 @@
   <form method="post" action="/importar" enctype="multipart/form-data"
         class="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
     <div>
-      <label class="block text-sm font-semibold mb-1">Hospital</label>
-      <select name="hospital_id" required class="w-full rounded-lg border border-slate-300 px-3 py-2">
-        <option value="">— Elige el hospital —</option>
+      <label class="block text-sm font-semibold mb-1">Hospital por defecto (opcional)</label>
+      <select name="hospital_id" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+        <option value="">— (usar la columna "hospital" del archivo) —</option>
         {% for h in hospitales %}
           <option value="{{ h.id }}">{{ h.nombre }}</option>
         {% endfor %}
       </select>
-      <p class="text-xs text-slate-400 mt-1">Las personas de la lista se agregarán a este hospital.</p>
+      <p class="text-xs text-slate-400 mt-1">
+        Se usa solo para las filas que <strong>no</strong> traigan la columna <code>hospital</code>.
+        Si tu lista es de varios hospitales, agrega una columna <code>hospital</code> y cada
+        persona irá al suyo (se crean los que falten).
+      </p>
     </div>
     <div>
       <label class="block text-sm font-semibold mb-1">Archivo CSV</label>
@@ -49,11 +51,15 @@
     <p>La primera fila son los <strong>encabezados</strong>. Se reconocen estas columnas
        (solo <strong>nombre</strong> o <strong>cédula</strong> hace falta; el resto es opcional):</p>
     <p class="mt-2 font-mono text-xs bg-white border border-slate-200 rounded px-2 py-1">
-      nombre, apellido, cedula, tipo_sangre, edad, sexo, estado, observaciones
+      nombre, apellido, cedula, tipo_sangre, edad, sexo, estado, observaciones, hospital
     </p>
     <p class="mt-2 text-xs">
-      💡 En Excel: <strong>Archivo → Guardar como → CSV (delimitado por comas)</strong>.
-      También funciona el archivo <code>lista_personas.csv</code> que genera el lector de fotos.
+      💡 Para una lista de <strong>varios hospitales</strong>, incluye la columna
+      <code>hospital</code> (con el nombre del hospital de cada persona). Los que no existan
+      se crean automáticamente.
+    </p>
+    <p class="mt-1 text-xs">
+      En Excel: <strong>Archivo → Guardar como → CSV (delimitado por comas)</strong>.
     </p>
   </div>
 </div>
