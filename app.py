@@ -16,7 +16,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import jinja2
-from fastapi import FastAPI, Form, Request
+import csv
+import io
+
+from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -173,6 +176,71 @@ def persona(request: Request, patient_id: int):
     if not p:
         return RedirectResponse("/personas", status_code=303)
     return templates.TemplateResponse(request, "persona.html", _ctx(request, p=p))
+
+
+# ===================== IMPORTAR LISTA (CSV) — publico =====================
+
+_ALIAS = {
+    "nombre": ["nombre", "nombres", "nombre completo"],
+    "apellido": ["apellido", "apellidos"],
+    "cedula": ["cedula", "ci", "cedula de identidad", "identidad", "c i"],
+    "tipo_sangre": ["tipo de sangre", "tipo sangre", "sangre", "tiposangre"],
+    "edad": ["edad", "edad aprox", "edad aproximada"],
+    "sexo": ["sexo", "genero"],
+    "estado": ["estado", "condicion"],
+    "observaciones": ["observaciones", "notas", "obs", "comentario", "comentarios"],
+    "seccion": ["seccion", "area", "sala"],
+}
+MAX_FILAS_IMPORT = 2000
+
+
+def _val(nrow: dict, claves: list[str]) -> str:
+    for k in claves:
+        if nrow.get(k):
+            return str(nrow[k]).strip()
+    return ""
+
+
+@app.get("/importar", response_class=HTMLResponse)
+def importar_form(request: Request, ok: str = "", n: int = 0):
+    return templates.TemplateResponse(request, "importar.html",
+                                      _ctx(request, hospitales=db.listar_hospitales(),
+                                           ok=ok, n=n))
+
+
+@app.post("/importar")
+async def importar(request: Request, hospital_id: int = Form(...),
+                   archivo: UploadFile = File(...)):
+    if not db.obtener_hospital(hospital_id):
+        return RedirectResponse("/importar?ok=errhosp", status_code=303)
+    datos = await archivo.read()
+    try:
+        texto = datos.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        texto = datos.decode("latin-1", errors="replace")
+    try:
+        filas = list(csv.DictReader(io.StringIO(texto)))
+    except Exception:  # noqa: BLE001
+        return RedirectResponse("/importar?ok=errcsv", status_code=303)
+
+    n = 0
+    for row in filas[:MAX_FILAS_IMPORT]:
+        nrow = {db.normalizar(k or ""): v for k, v in row.items()}
+        nombre = _val(nrow, _ALIAS["nombre"])
+        cedula = _val(nrow, _ALIAS["cedula"])
+        if not nombre and not cedula:
+            continue
+        obs = _val(nrow, _ALIAS["observaciones"])
+        seccion = _val(nrow, _ALIAS["seccion"])
+        if seccion:
+            obs = (seccion + " · " + obs).strip(" ·")
+        db.crear_patient(
+            hospital_id, nombre, _val(nrow, _ALIAS["apellido"]), cedula,
+            _val(nrow, _ALIAS["tipo_sangre"]), _val(nrow, _ALIAS["edad"]),
+            _val(nrow, _ALIAS["sexo"]), _val(nrow, _ALIAS["estado"]), obs,
+        )
+        n += 1
+    return RedirectResponse(f"/importar?ok=ok&n={n}", status_code=303)
 
 
 # ===================== CAPITAN: login =====================
