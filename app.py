@@ -191,7 +191,7 @@ _ALIAS = {
     "observaciones": ["observaciones", "notas", "obs", "comentario", "comentarios"],
     "seccion": ["seccion", "area", "sala"],
 }
-MAX_FILAS_IMPORT = 2000
+MAX_FILAS_IMPORT = 50000
 
 
 def _val(nrow: dict, claves: list[str]) -> str:
@@ -223,7 +223,7 @@ async def importar(request: Request, hospital_id: int = Form(...),
     except Exception:  # noqa: BLE001
         return RedirectResponse("/importar?ok=errcsv", status_code=303)
 
-    n = 0
+    personas = []
     for row in filas[:MAX_FILAS_IMPORT]:
         nrow = {db.normalizar(k or ""): v for k, v in row.items()}
         nombre = _val(nrow, _ALIAS["nombre"])
@@ -234,12 +234,13 @@ async def importar(request: Request, hospital_id: int = Form(...),
         seccion = _val(nrow, _ALIAS["seccion"])
         if seccion:
             obs = (seccion + " · " + obs).strip(" ·")
-        db.crear_patient(
-            hospital_id, nombre, _val(nrow, _ALIAS["apellido"]), cedula,
-            _val(nrow, _ALIAS["tipo_sangre"]), _val(nrow, _ALIAS["edad"]),
-            _val(nrow, _ALIAS["sexo"]), _val(nrow, _ALIAS["estado"]), obs,
-        )
-        n += 1
+        personas.append({
+            "nombre": nombre, "apellido": _val(nrow, _ALIAS["apellido"]),
+            "cedula": cedula, "tipo_sangre": _val(nrow, _ALIAS["tipo_sangre"]),
+            "edad": _val(nrow, _ALIAS["edad"]), "sexo": _val(nrow, _ALIAS["sexo"]),
+            "estado": _val(nrow, _ALIAS["estado"]), "observaciones": obs,
+        })
+    n = db.crear_patients_bulk(hospital_id, personas)
     return RedirectResponse(f"/importar?ok=ok&n={n}", status_code=303)
 
 

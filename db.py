@@ -179,6 +179,21 @@ patients = Table(
 def crear_tablas() -> None:
     metadata.create_all(engine)
     _migrar_columnas_paciente()
+    _crear_indices()
+
+
+def _crear_indices() -> None:
+    """Indices para que la busqueda de personas sea rapida con miles de registros."""
+    idx = [
+        "CREATE INDEX IF NOT EXISTS idx_pac_norm ON patients (nombre_normalizado)",
+        "CREATE INDEX IF NOT EXISTS idx_pac_cedula ON patients (cedula)",
+    ]
+    try:
+        with engine.begin() as con:
+            for s in idx:
+                con.execute(text(s))
+    except Exception as e:  # noqa: BLE001
+        print("Aviso: no se pudieron crear indices:", e)
 
 
 def _migrar_columnas_paciente() -> None:
@@ -416,6 +431,34 @@ def crear_patient(hospital_id: int, nombre: str, apellido: str, cedula: str,
             edad=edad, sexo=sexo, estado=estado, observaciones=observaciones,
             creado_en=ahora(),
         )).inserted_primary_key[0]
+
+
+def crear_patients_bulk(hospital_id: int, personas: list[dict]) -> int:
+    """Inserta MUCHAS personas de una vez (rapido para miles). Cada dict acepta
+    nombre, apellido, cedula, tipo_sangre, edad, sexo, estado, observaciones."""
+    if not personas:
+        return 0
+    t = ahora()
+    filas = []
+    for p in personas:
+        nombre = (p.get("nombre") or "").strip()
+        apellido = (p.get("apellido") or "").strip()
+        filas.append({
+            "hospital_id": hospital_id, "nombre": nombre, "apellido": apellido,
+            "nombre_normalizado": normalizar(f"{nombre} {apellido}"),
+            "cedula": (p.get("cedula") or "").strip(),
+            "tipo_sangre": (p.get("tipo_sangre") or "").strip(),
+            "edad": (p.get("edad") or "").strip(),
+            "sexo": (p.get("sexo") or "").strip(),
+            "estado": (p.get("estado") or "").strip(),
+            "observaciones": (p.get("observaciones") or "").strip(),
+            "creado_en": t,
+        })
+    # insertar en lotes (evita el limite de parametros de Postgres)
+    with engine.begin() as con:
+        for i in range(0, len(filas), 500):
+            con.execute(patients.insert(), filas[i:i + 500])
+    return len(filas)
 
 
 _PAC_COLS = [
